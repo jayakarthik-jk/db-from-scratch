@@ -1,51 +1,57 @@
+mod frontend;
+
 use std::{
-    io::{self, Write},
+    io::{self, Cursor, Write},
     process::exit,
 };
 
-fn print_prefix(stdout: &mut io::Stdout) {
-    print!("> ");
-    stdout.flush().expect("Unable to flush to stdout");
-}
+use frontend::parser::Parser;
 
 fn main() {
     let stdin = io::stdin();
     let mut stdout = io::stdout();
-    let mut app = App::default();
+    //let app = App::default();
 
     loop {
         let mut command = String::new();
 
-        print_prefix(&mut stdout);
+        print!("> ");
+        stdout.flush().expect("Unable to flush to stdout");
 
         while !command.ends_with(";\n") {
-            let mut buffer = String::new();
-            stdin
-                .read_line(&mut buffer)
+            let read = stdin
+                .read_line(&mut command)
                 .expect("Unable to read command");
-            command.push_str(&buffer);
-        }
-
-        let statement = match App::prepare_statement(&command[..command.len() - 2].trim()) {
-            Ok(statement) => statement,
-            Err(err) => {
-                use StatementPreparationError::*;
-                match err {
-                    UnrecognizedCommand => eprintln!("Unrecognized command"),
-                    MissingField => eprintln!("Insert statement missing fields"),
-                    InvalidValue => eprintln!("Invalid value for field"),
-                }
-                continue;
-            }
-        };
-
-        if let Err(err) = app.process_statement(statement) {
-            match err {
-                StatementProcessingError::UnknownMetaCommand => {
-                    eprintln!("Unrecognized Meta command")
-                }
+            if read == 0 {
+                return;
             }
         }
+        
+        let parser = Parser::new(Cursor::new(command));
+        parser.for_each(|statement| {
+            println!("{statement:?}");
+        });
+
+        //let statement = match App::prepare_statement(&command[..command.len() - 2].trim()) {
+        //    Ok(statement) => statement,
+        //    Err(err) => {
+        //        use StatementPreparationError::*;
+        //        match err {
+        //            UnrecognizedCommand => eprintln!("Unrecognized command"),
+        //            MissingField => eprintln!("Insert statement missing fields"),
+        //            InvalidValue => eprintln!("Invalid value for field"),
+        //        }
+        //        continue;
+        //    }
+        //};
+        //
+        //if let Err(err) = app.process_statement(statement) {
+        //    match err {
+        //        StatementProcessingError::UnknownMetaCommand => {
+        //            eprintln!("Unrecognized Meta command")
+        //        }
+        //    }
+        //}
     }
 }
 
@@ -156,7 +162,7 @@ struct Page {
 }
 
 impl Page {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             data: [0u8; PAGE_SIZE],
         }
