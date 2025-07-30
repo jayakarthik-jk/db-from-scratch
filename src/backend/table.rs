@@ -1,15 +1,14 @@
 use std::{io, path::Path};
 
-use super::{pager::Pager, row::{Row, ROWS_PER_PAGE, ROW_SIZE}};
-
-
-
+use super::{
+    pager::Pager,
+    row::{Row, ROWS_PER_PAGE, ROW_SIZE},
+};
 
 pub(crate) struct Table {
     pub(crate) row_count: usize,
     pub(crate) pager: Pager,
 }
-
 
 pub(crate) enum InsertError {
     MaxRowReached,

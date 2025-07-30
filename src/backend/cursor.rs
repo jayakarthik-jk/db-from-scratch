@@ -1,4 +1,7 @@
-use super::{row::{Row, ROWS_PER_PAGE, ROW_SIZE}, table::Table};
+use super::{
+    row::{Row, ROWS_PER_PAGE, ROW_SIZE},
+    table::Table,
+};
 
 pub(crate) struct Cursor<'table> {
     table: &'table mut Table,
@@ -7,10 +10,7 @@ pub(crate) struct Cursor<'table> {
 
 impl<'table> Cursor<'table> {
     pub(crate) fn from_start(table: &'table mut Table) -> Self {
-        Self {
-            table,
-            current: 0
-        }
+        Self { table, current: 0 }
     }
 
     pub(crate) fn from_end(table: &'table mut Table) -> Self {

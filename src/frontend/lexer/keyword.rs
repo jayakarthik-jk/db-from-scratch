@@ -1,4 +1,4 @@
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub(crate) enum Keyword {
     Select,
     Insert,
@@ -12,6 +12,7 @@ impl Keyword {
         let keyword = match keyword.to_lowercase().as_str() {
             "select" => Keyword::Select,
             "insert" => Keyword::Insert,
+            "from" => Keyword::From,
             //"delete" => Keyword::Delete,
             //"update" => Keyword::Update,
             _ => return None,

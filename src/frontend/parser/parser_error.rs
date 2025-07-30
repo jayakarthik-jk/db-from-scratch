@@ -52,7 +52,6 @@ impl From<ParserErrorKind> for ParserError {
 
 #[derive(Debug)]
 pub(crate) enum ParserErrorKind {
-    EOF,
     NotAnExpression,
     LexerError(LexerError),
     TrailingSeperator {
@@ -71,4 +70,5 @@ pub(crate) enum ParserErrorKind {
     Unexpected(Token),
     IncompleteExpression(Token),
     UnexpectedStatement,
+    TableNameExpected(Token),
 }

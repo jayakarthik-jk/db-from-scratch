@@ -1,6 +1,6 @@
 use super::{keyword::Keyword, literal::Literal, symbol::Symbol, Position};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub(crate) enum TokenKind {
     Keyword(Keyword),
     Symbol(Symbol),

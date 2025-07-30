@@ -1,11 +1,17 @@
 pub(crate) mod backend;
 pub(crate) mod frontend;
+#[macro_use]
+pub(crate) mod util;
 
-use std::
-    io::{self, Write}
-;
+use std::io::{self, Write};
 
-use backend::{cursor::Cursor, row::Row, table::{InsertError, Table}};
+use backend::{
+    cursor::Cursor,
+    row::Row,
+    table::{InsertError, Table},
+};
+use frontend::{lexer::{reader::CharacterIterator, Lexer}, parser::Parser};
+use util::layer::BufferedLayer;
 
 fn main() {
     let stdin = io::stdin();
@@ -26,10 +32,12 @@ fn main() {
             }
         }
 
-        //let parser = Parser::new(Cursor::new(command));
-        //parser.for_each(|statement| {
-        //    println!("{statement:?}");
-        //});
+        let reader = CharacterIterator::new(std::io::Cursor::new(command.clone()));
+        let lexer = Lexer::new(BufferedLayer::new(reader));
+        let parser = Parser::new(BufferedLayer::new(lexer));
+        parser.for_each(|statement| {
+           println!("{statement:?}");
+        });
 
         let statement = match App::prepare_statement(&command[..command.len() - 2].trim()) {
             Ok(statement) => statement,
@@ -46,15 +54,13 @@ fn main() {
 
         match app.process_statement(statement) {
             Ok(true) => break,
-            Err(err) => {
-                match err {
-                    StatementProcessingError::UnknownMetaCommand => {
-                        eprintln!("Unrecognized Meta command")
-                    }
-                    StatementProcessingError::MaxRowReached => eprintln!("Max row reached"),
+            Err(err) => match err {
+                StatementProcessingError::UnknownMetaCommand => {
+                    eprintln!("Unrecognized Meta command")
                 }
-            }
-            _ => ()
+                StatementProcessingError::MaxRowReached => eprintln!("Max row reached"),
+            },
+            _ => (),
         }
     }
 }
@@ -128,7 +134,10 @@ impl App {
         }));
     }
 
-    fn process_statement(&mut self, statement: Statement) -> Result<bool, StatementProcessingError> {
+    fn process_statement(
+        &mut self,
+        statement: Statement,
+    ) -> Result<bool, StatementProcessingError> {
         match statement {
             Statement::Meta(command) => match command.as_str() {
                 "exit" => {
@@ -152,4 +161,3 @@ impl App {
         Ok(false)
     }
 }
-

@@ -40,7 +40,7 @@ impl Row {
         let username: &[u8; USERNAME_SIZE] = &source
             [USERNAME_OFFSET..USERNAME_OFFSET + USERNAME_SIZE]
             .try_into()
-            .expect("Unable to deserialize email from source");
+            .expect("Unable to deserialize username from source");
         let email: &[u8; EMAIL_SIZE] = &source[EMAIL_OFFSET..EMAIL_OFFSET + EMAIL_SIZE]
             .try_into()
             .expect("Unable to deserialize email from source");
@@ -53,7 +53,7 @@ impl Row {
     }
 }
 
-trait NBytes {
+pub(crate) trait NBytes {
     fn get_n_bytes<const N: usize>(&self) -> [u8; N];
 }
 
@@ -65,4 +65,3 @@ impl NBytes for &[u8] {
         result
     }
 }
-
