@@ -12,7 +12,7 @@ use symbol::Symbol;
 pub(crate) use token::Token;
 use token::TokenKind;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum LexerError {
     UnTerminatedStringLiteral(Position),
     NumberExceededSize(Position),

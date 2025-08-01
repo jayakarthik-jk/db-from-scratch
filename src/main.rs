@@ -16,7 +16,7 @@ use util::layer::BufferedLayer;
 fn main() {
     let stdin = io::stdin();
     let mut stdout = io::stdout();
-    let mut app = App::new();
+    // let mut app = App::new();
     loop {
         let mut command = String::new();
 
@@ -36,32 +36,32 @@ fn main() {
         let lexer = Lexer::new(BufferedLayer::new(reader));
         let parser = Parser::new(BufferedLayer::new(lexer));
         parser.for_each(|statement| {
-           println!("{statement:?}");
+           println!("{:?}", statement.expect("Unable to parse statement"));
         });
 
-        let statement = match App::prepare_statement(&command[..command.len() - 2].trim()) {
-            Ok(statement) => statement,
-            Err(err) => {
-                use StatementPreparationError::*;
-                match err {
-                    UnrecognizedCommand => eprintln!("Unrecognized command"),
-                    MissingField => eprintln!("Insert statement missing fields"),
-                    InvalidValue => eprintln!("Invalid value for field"),
-                }
-                continue;
-            }
-        };
-
-        match app.process_statement(statement) {
-            Ok(true) => break,
-            Err(err) => match err {
-                StatementProcessingError::UnknownMetaCommand => {
-                    eprintln!("Unrecognized Meta command")
-                }
-                StatementProcessingError::MaxRowReached => eprintln!("Max row reached"),
-            },
-            _ => (),
-        }
+        // let statement = match App::prepare_statement(&command[..command.len() - 2].trim()) {
+        //     Ok(statement) => statement,
+        //     Err(err) => {
+        //         use StatementPreparationError::*;
+        //         match err {
+        //             UnrecognizedCommand => eprintln!("Unrecognized command"),
+        //             MissingField => eprintln!("Insert statement missing fields"),
+        //             InvalidValue => eprintln!("Invalid value for field"),
+        //         }
+        //         continue;
+        //     }
+        // };
+        //
+        // match app.process_statement(statement) {
+        //     Ok(true) => break,
+        //     Err(err) => match err {
+        //         StatementProcessingError::UnknownMetaCommand => {
+        //             eprintln!("Unrecognized Meta command")
+        //         }
+        //         StatementProcessingError::MaxRowReached => eprintln!("Max row reached"),
+        //     },
+        //     _ => (),
+        // }
     }
 }
 

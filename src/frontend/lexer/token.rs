@@ -8,7 +8,7 @@ pub(crate) enum TokenKind {
     Identifier(Identifier),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub(crate) struct Token {
     pub(crate) kind: TokenKind,
     pub(crate) position: Position,
@@ -27,13 +27,3 @@ impl Token {
 }
 
 pub(crate) type Identifier = String;
-
-trait Dummy {
-    fn dummy() -> Self;
-}
-
-impl Dummy for Identifier {
-    fn dummy() -> Self {
-        String::new()
-    }
-}

@@ -6,7 +6,7 @@ pub(crate) struct Character {
     pub(crate) position: Position
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Position {
     pub row: usize,
     pub col: usize,

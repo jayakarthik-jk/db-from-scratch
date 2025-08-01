@@ -1,10 +1,15 @@
-use crate::{unwrap_ok, util::layer::Layer};
+use crate::{
+    match_token, unwrap_ok,
+    util::{layer::Layer, match_token},
+};
 
 use super::lexer::{keyword::Keyword, symbol::Symbol, token::TokenKind, LexerError, Token};
+use datatype::Datatype;
 use expression::{AssignmentOperator, BinaryOperator, Expression};
 use parser_error::{ParserError, ParserErrorKind};
-use statement::{SelectStatement, Statement};
+use statement::{Column, Statement};
 
+pub(crate) mod datatype;
 pub(crate) mod expression;
 pub(crate) mod parser_error;
 pub(crate) mod statement;
@@ -14,6 +19,28 @@ where
     TokenLayer: Layer<Token, LexerError>,
 {
     tokens: TokenLayer,
+}
+
+impl<TokenLayer> Iterator for Parser<TokenLayer>
+where
+    TokenLayer: Layer<Token, LexerError>,
+{
+    type Item = Result<Statement, ParserError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let token = unwrap_ok!(self.get_next_token());
+        let TokenKind::Keyword(keyword) = token.kind else {
+            return Some(Err(ParserErrorKind::KeywordExpected(token).into()));
+        };
+        let statement = unwrap_ok!(match keyword {
+            Keyword::Select => self.parse_select_statement(),
+            Keyword::Create => self.parse_create_statement(),
+            _ => return Some(Err(ParserErrorKind::UnexpectedStatement.into())),
+        });
+
+        match_token!(self.get_next_token(), TokenKind::Symbol(Symbol::Semicolon));
+        Some(Ok(statement))
+    }
 }
 
 impl<TokenLayer> Parser<TokenLayer>
@@ -116,7 +143,25 @@ where
         let token = unwrap_ok!(self.get_next_token());
         match token.kind {
             TokenKind::Literal(literal) => Some(Ok(Expression::Literal(literal))),
-            TokenKind::Identifier(ident) => Some(Ok(Expression::Identifier(ident))),
+            TokenKind::Identifier(ident) => {
+                let next_token = unwrap_ok!(self.get_next_token());
+                if let TokenKind::Symbol(Symbol::OpenParanthesis) = next_token.kind {
+                    // Function call
+                    let expressions = unwrap_ok!(self.parse_separated_expressions(Symbol::Comma));
+                    let close_paren_token = unwrap_ok!(self.get_next_token());
+                    if close_paren_token.kind != TokenKind::Symbol(Symbol::CloseParanthesis) {
+                        return Some(Err(ParserErrorKind::Unexpected(close_paren_token).into()));
+                    }
+                    return Some(Ok(Expression::FunctionCall {
+                        ident,
+                        arguments: expressions,
+                    }));
+                } else {
+                    // Just an identifier
+                    self.tokens.rewind(next_token);
+                    return Some(Ok(Expression::Identifier(ident)));
+                }
+            }
             TokenKind::Symbol(Symbol::OpenParanthesis) => {
                 let expression = unwrap_ok!(self.parse_expression());
 
@@ -129,6 +174,11 @@ where
                     Err(err) => Err(err),
                 })
             }
+            TokenKind::Symbol(Symbol::Star) => {
+                // This is a special case for `SELECT *`
+                // We treat it as a wildcard expression
+                Some(Ok(Expression::Wildcard))
+            }
             _ => {
                 self.tokens.rewind(token);
                 Some(Err(ParserErrorKind::NotAnExpression.into()))
@@ -140,36 +190,32 @@ where
         &mut self,
         separator: Symbol,
     ) -> Option<Result<Vec<Expression>, ParserError>> {
+        self.parse_seperated(separator, |parser| parser.parse_expression())
+    }
+
+    fn parse_seperated<Callback, ReturnType>(
+        &mut self,
+        separator: Symbol,
+        callback: Callback,
+    ) -> Option<Result<Vec<ReturnType>, ParserError>>
+    where
+        Callback: Fn(&mut Self) -> Option<Result<ReturnType, ParserError>>,
+    {
         let mut expressions = Vec::new();
-        let mut first = true;
 
         loop {
-            let expr = match self.parse_assignment_expression()? {
-                Ok(e) => e,
-                Err(err) if matches!(err.kind, ParserErrorKind::NotAnExpression) => break,
-                Err(err) => return Some(Err(err)),
-            };
-
-            if !first {
-                // Ensure separator before each expression
-                match self.get_next_token()? {
-                    Ok(Token {
-                        kind: TokenKind::Symbol(sym),
-                        ..
-                    }) if sym == separator => (),
-                    Ok(tok) => {
-                        self.tokens.rewind(tok);
-                        return Some(Err(ParserErrorKind::MissingSeperator {
-                            seperator: separator,
-                        }
-                        .into()));
-                    }
-                    Err(err) => return Some(Err(err)),
-                };
-            }
-
+            let expr = unwrap_ok!(callback(self));
             expressions.push(expr);
-            first = false;
+            // Ensure separator before each expression
+            let token = unwrap_ok!(self.get_next_token());
+
+            if let TokenKind::Symbol(symbol) = token.kind {
+                if symbol == separator {
+                    continue;
+                }
+            }
+            self.tokens.rewind(token);
+            break;
         }
 
         Some(Ok(expressions))
@@ -177,14 +223,17 @@ where
 
     fn parse_select_statement(&mut self) -> Option<Result<Statement, ParserError>> {
         let expressions = unwrap_ok!(self.parse_separated_expressions(Symbol::Comma));
-        // parse the `FROM` clause
+
         let from_token = unwrap_ok!(self.get_next_token());
         if from_token.kind != TokenKind::Keyword(Keyword::From) {
-            return Some(Err(ParserErrorKind::KeywordExpected(from_token).into()));
+            self.tokens.rewind(from_token);
+            return Some(Ok(Statement::Select {
+                select_expressions: expressions,
+                from: None,
+            }));
         }
 
         let table_name_token = unwrap_ok!(self.get_next_token());
-
         let table_name = match table_name_token.kind {
             TokenKind::Identifier(ident) => ident,
             _ => {
@@ -193,33 +242,70 @@ where
                 ))
             }
         };
-        return Some(Ok(Statement::Select(SelectStatement {
+        return Some(Ok(Statement::Select {
             select_expressions: expressions,
             from: Some(table_name),
-        })));
+        }));
     }
 
-    fn parse_insert_statement(&mut self) -> Result<Statement, ParserError> {
-        todo!()
-    }
-}
+    pub(crate) fn parse_create_statement(&mut self) -> Option<Result<Statement, ParserError>> {
+        match_token!(self.get_next_token(), TokenKind::Keyword(Keyword::Table));
 
-impl<TokenLayer> Iterator for Parser<TokenLayer>
-where
-    TokenLayer: Layer<Token, LexerError>,
-{
-    type Item = Result<Statement, ParserError>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let token = unwrap_ok!(self.get_next_token());
-        let TokenKind::Keyword(keyword) = token.kind else {
-            return Some(Err(ParserErrorKind::KeywordExpected(token).into()));
+        let table_name_token = unwrap_ok!(self.get_next_token());
+        let table_name = match table_name_token.kind {
+            TokenKind::Identifier(ident) => ident,
+            _ => {
+                return Some(Err(
+                    ParserErrorKind::TableNameExpected(table_name_token).into()
+                ))
+            }
         };
 
-        Some(match keyword {
-            Keyword::Select => self.parse_select_statement()?,
-            Keyword::Insert => self.parse_insert_statement(),
-            _ => return Some(Err(ParserErrorKind::UnexpectedStatement.into())),
-        })
+        match_token!(
+            self.get_next_token(),
+            TokenKind::Symbol(Symbol::OpenParanthesis)
+        );
+
+        let columns = unwrap_ok!(self.parse_seperated(Symbol::Comma, |parser| parser
+            .parse_create_statement_column()));
+
+        match_token!(
+            self.get_next_token(),
+            TokenKind::Symbol(Symbol::CloseParanthesis)
+        );
+
+        Some(Ok(Statement::Create {
+            table_name,
+            columns,
+        }))
+    }
+
+    pub(crate) fn parse_create_statement_column(&mut self) -> Option<Result<Column, ParserError>> {
+        let ident_token = unwrap_ok!(self.get_next_token());
+        let ident = match ident_token.kind {
+            TokenKind::Identifier(ident) => ident,
+            _ => {
+                return Some(Err(ParserErrorKind::Unexpected(ident_token).into()));
+            }
+        };
+
+        let data_type_token = unwrap_ok!(self.get_next_token());
+        let data_type = match data_type_token.kind {
+            TokenKind::Keyword(keyword) => Datatype::from_keyword(keyword),
+            _ => {
+                return Some(Err(ParserErrorKind::Unexpected(data_type_token).into()));
+            }
+        };
+        if data_type.is_none() {
+            return Some(Err(ParserErrorKind::Unexpected(data_type_token).into()));
+        }
+        if let Some(data_type) = data_type {
+            return Some(Ok(Column {
+                name: ident,
+                data_type,
+            }));
+        } else {
+            return Some(Err(ParserErrorKind::Unexpected(data_type_token).into()));
+        }
     }
 }

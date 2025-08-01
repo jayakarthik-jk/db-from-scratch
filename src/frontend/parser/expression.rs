@@ -1,6 +1,8 @@
+use std::fmt::Display;
+
 use crate::frontend::lexer::{literal::Literal, symbol::Symbol, token::Identifier};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum BinaryOperator {
     // binary
     Addition,
@@ -63,7 +65,27 @@ impl BinaryOperator {
     }
 }
 
-#[derive(Debug)]
+impl Display for BinaryOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let symbol = match self {
+            BinaryOperator::Addition => Symbol::Plus,
+            BinaryOperator::Subtraction => Symbol::Minus,
+            BinaryOperator::Multiplication => Symbol::Star,
+            BinaryOperator::Division => Symbol::Divide,
+            BinaryOperator::Modulo => Symbol::Percent,
+            BinaryOperator::Equals => Symbol::Equals,
+            BinaryOperator::NotEquals => Symbol::NotEquals,
+            BinaryOperator::LessThan => Symbol::LessThan,
+            BinaryOperator::LessThanOrEquals => Symbol::LessThanOrEquals,
+            BinaryOperator::GreaterThan => Symbol::GreaterThan,
+            BinaryOperator::GreaterThanOrEquals => Symbol::GreaterThanOrEquals,
+        };
+        write!(f, "{}", symbol)
+    }
+}
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum AssignmentOperator {
     Equal,
     PlusEquals,
@@ -88,10 +110,29 @@ impl AssignmentOperator {
     }
 }
 
-#[derive(Debug)]
+impl Display for AssignmentOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let symbol = match self {
+            AssignmentOperator::Equal => Symbol::Equal,
+            AssignmentOperator::PlusEquals => Symbol::PlusEquals,
+            AssignmentOperator::MinusEquals => Symbol::MinusEquals,
+            AssignmentOperator::StarEquals => Symbol::StarEquals,
+            AssignmentOperator::DivideEquals => Symbol::DivideEquals,
+            AssignmentOperator::PercentEquals => Symbol::PercentEquals,
+        };
+        write!(f, "{}", symbol)
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub(crate) enum Expression {
+    Wildcard,
     Literal(Literal),
     Identifier(Identifier),
+    FunctionCall {
+        ident: Identifier,
+        arguments: Vec<Expression>,
+    },
     Binary {
         left: Box<Expression>,
         operator: BinaryOperator,
@@ -102,4 +143,30 @@ pub(crate) enum Expression {
         operator: AssignmentOperator,
         right: Box<Expression>,
     },
+}
+
+impl Display for Expression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Expression::Wildcard => write!(f, "*"),
+            Expression::Literal(literal) => write!(f, "{}", literal),
+            Expression::Identifier(ident) => write!(f, "{}", ident),
+            Expression::FunctionCall { ident, arguments } => {
+                write!(f, "{}(", ident)?;
+                for (i, arg) in arguments.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", arg)?;
+                }
+                write!(f, ")")
+            }
+            Expression::Binary { left, operator, right } => {
+                write!(f, "{} {} {}", left, operator, right)
+            }
+            Expression::Assign { ident, operator, right } => {
+                write!(f, "{} {} {}", ident, operator, right)
+            }
+        }
+    }
 }
