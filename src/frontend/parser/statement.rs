@@ -10,7 +10,6 @@ pub(crate) struct Column {
     pub data_type: Datatype,
 }
 
-
 #[derive(Debug)]
 pub(crate) enum Statement {
     // DDL
@@ -34,7 +33,10 @@ pub(crate) enum Statement {
 impl Display for Statement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Statement::Create { table_name, columns } => {
+            Statement::Create {
+                table_name,
+                columns,
+            } => {
                 write!(f, "CREATE TABLE {} (", table_name)?;
                 for (i, column) in columns.iter().enumerate() {
                     if i > 0 {
@@ -49,7 +51,10 @@ impl Display for Statement {
             Statement::Insert => write!(f, "INSERT"),
             Statement::Update => write!(f, "UPDATE"),
             Statement::Delete => write!(f, "DELETE"),
-            Statement::Select { select_expressions, from } => {
+            Statement::Select {
+                select_expressions,
+                from,
+            } => {
                 write!(f, "SELECT ")?;
                 for (i, expr) in select_expressions.iter().enumerate() {
                     if i > 0 {

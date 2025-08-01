@@ -10,7 +10,10 @@ use backend::{
     row::Row,
     table::{InsertError, Table},
 };
-use frontend::{lexer::{reader::CharacterIterator, Lexer}, parser::Parser};
+use frontend::{
+    lexer::{reader::CharacterIterator, Lexer},
+    parser::Parser,
+};
 use util::layer::BufferedLayer;
 
 fn main() {
@@ -36,7 +39,7 @@ fn main() {
         let lexer = Lexer::new(BufferedLayer::new(reader));
         let parser = Parser::new(BufferedLayer::new(lexer));
         parser.for_each(|statement| {
-           println!("{:?}", statement.expect("Unable to parse statement"));
+            println!("{:?}", statement.expect("Unable to parse statement"));
         });
 
         // let statement = match App::prepare_statement(&command[..command.len() - 2].trim()) {

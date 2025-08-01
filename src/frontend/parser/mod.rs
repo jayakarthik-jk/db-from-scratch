@@ -1,7 +1,4 @@
-use crate::{
-    match_token, unwrap_ok,
-    util::{layer::Layer, match_token},
-};
+use crate::{match_token, unwrap_ok, util::layer::Layer};
 
 use super::lexer::{keyword::Keyword, symbol::Symbol, token::TokenKind, LexerError, Token};
 use datatype::Datatype;

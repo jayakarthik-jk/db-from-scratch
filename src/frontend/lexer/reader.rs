@@ -3,7 +3,7 @@ use std::io::{BufReader, Read};
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub(crate) struct Character {
     pub(crate) value: char,
-    pub(crate) position: Position
+    pub(crate) position: Position,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -82,7 +82,10 @@ impl<T: Read> Iterator for CharacterIterator<T> {
                         }
                     }
 
-                    return Some(Ok(Character { value: ch, position: self.position }));
+                    return Some(Ok(Character {
+                        value: ch,
+                        position: self.position,
+                    }));
                 }
                 Err(e) => {
                     let valid_up_to = e.valid_up_to();
@@ -110,7 +113,10 @@ impl<T: Read> Iterator for CharacterIterator<T> {
                         }
                     }
 
-                    return Some(Ok(Character { value: ch, position: self.position }));
+                    return Some(Ok(Character {
+                        value: ch,
+                        position: self.position,
+                    }));
                 }
             }
         }

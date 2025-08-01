@@ -84,7 +84,6 @@ impl Display for BinaryOperator {
     }
 }
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum AssignmentOperator {
     Equal,
@@ -161,10 +160,18 @@ impl Display for Expression {
                 }
                 write!(f, ")")
             }
-            Expression::Binary { left, operator, right } => {
+            Expression::Binary {
+                left,
+                operator,
+                right,
+            } => {
                 write!(f, "{} {} {}", left, operator, right)
             }
-            Expression::Assign { ident, operator, right } => {
+            Expression::Assign {
+                ident,
+                operator,
+                right,
+            } => {
                 write!(f, "{} {} {}", ident, operator, right)
             }
         }
