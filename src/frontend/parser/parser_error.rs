@@ -1,5 +1,5 @@
 use crate::frontend::lexer::{
-    reader::Position, symbol::Symbol, token::TokenKind, LexerError, Token,
+    keyword::Keyword, reader::Position, symbol::Symbol, token::TokenKind, LexerError, Token
 };
 
 #[derive(Debug, PartialEq)]
@@ -28,6 +28,11 @@ pub(crate) enum ParserErrorKind {
     IncompleteExpression(Token),
     UnexpectedStatement,
     TableNameExpected(Token),
+    UnExpectedAlterType {
+        expected: Keyword,
+        found: TokenKind,
+    },
+    Custom(String),
 }
 
 impl From<LexerError> for ParserError {
@@ -41,5 +46,15 @@ impl From<LexerError> for ParserError {
 impl From<ParserErrorKind> for ParserError {
     fn from(value: ParserErrorKind) -> Self {
         Self { kind: value }
+    }
+}
+
+pub trait IntoParseResult<T> {
+    fn as_err(self) -> Option<Result<T, ParserError>>;
+}
+
+impl<T> IntoParseResult<T> for &str {
+    fn as_err(self) -> Option<Result<T, ParserError>> {
+        Some(Err(ParserErrorKind::Custom(self.to_string()).into()))
     }
 }

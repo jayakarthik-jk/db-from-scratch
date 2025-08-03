@@ -14,6 +14,11 @@ pub(crate) enum Keyword {
     String,
     Boolean,
     DateTime,
+    Add,
+    Modify,
+    Rename,
+    Column,
+    To,
 }
 
 impl Keyword {
@@ -33,6 +38,11 @@ impl Keyword {
             "string" => Keyword::String,
             "boolean" => Keyword::Boolean,
             "datetime" => Keyword::DateTime,
+            "add" => Keyword::Add,
+            "modify" => Keyword::Modify,
+            "rename" => Keyword::Rename,
+            "column" => Keyword::Column,
+            "to" => Keyword::To,
             _ => return None,
         };
         return Some(keyword);

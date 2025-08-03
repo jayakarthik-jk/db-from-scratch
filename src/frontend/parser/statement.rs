@@ -1,8 +1,8 @@
-use std::fmt::Display;
+use std::fmt::{write, Display};
 
 use crate::frontend::lexer::token::Identifier;
 
-use super::{datatype::Datatype, expression::Expression};
+use super::{alter_type::AlterType, datatype::Datatype, expression::Expression};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Column {
@@ -17,7 +17,10 @@ pub(crate) enum Statement {
         table_name: Identifier,
         columns: Vec<Column>,
     },
-    Alter,
+    Alter {
+        table_name: Identifier,
+        alter_types: Vec<AlterType>,
+    },
     Drop,
     // DML
     Insert,
@@ -46,7 +49,26 @@ impl Display for Statement {
                 }
                 write!(f, ")")
             }
-            Statement::Alter => write!(f, "ALTER"),
+            Statement::Alter {
+                table_name,
+                alter_types,
+            } => {
+                write!(f, "ALTER TABLE {} ", table_name)?;
+                for (i, alter_type) in alter_types.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    match alter_type {
+                        AlterType::Add(column) => write!(f, "ADD {}", column.name)?,
+                        AlterType::Drop(name) => write!(f, "DROP COLUMN {}", name)?,
+                        AlterType::Modify(column) => write!(f, "MODIFY {}", column.name)?,
+                        AlterType::Rename { old, new } => {
+                            write!(f, "RENAME COLUMN {} TO {}", old, new)?
+                        }
+                    }
+                }
+                Ok(())
+            }
             Statement::Drop => write!(f, "DROP"),
             Statement::Insert => write!(f, "INSERT"),
             Statement::Update => write!(f, "UPDATE"),
