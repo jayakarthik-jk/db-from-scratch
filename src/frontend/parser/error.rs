@@ -1,5 +1,5 @@
 use crate::frontend::lexer::{
-    keyword::Keyword, reader::Position, symbol::Symbol, token::TokenKind, LexerError, Token
+    keyword::Keyword, token::TokenKind, LexerError, Token
 };
 
 #[derive(Debug, PartialEq)]
@@ -11,21 +11,12 @@ pub(crate) struct ParserError {
 pub(crate) enum ParserErrorKind {
     NotAnExpression,
     LexerError(LexerError),
-    TrailingSeperator {
-        position: Position,
-        seperator: Symbol,
-    },
-    MissingSeperator {
-        //position: Position,
-        seperator: Symbol,
-    },
     KeywordExpected(Token),
     UnexpectedToken {
         expected: TokenKind,
         found: Token,
     },
     Unexpected(Token),
-    IncompleteExpression(Token),
     UnexpectedStatement,
     TableNameExpected(Token),
     UnExpectedAlterType {

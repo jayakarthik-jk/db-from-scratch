@@ -1,8 +1,12 @@
-use std::fmt::{write, Display};
+pub(crate) mod alter;
+pub(crate) mod create;
+pub(crate) mod select;
+pub(crate) mod drop;
 
+use super::{datatype::Datatype, expression::Expression};
 use crate::frontend::lexer::token::Identifier;
-
-use super::{alter_type::AlterType, datatype::Datatype, expression::Expression};
+use alter::AlterType;
+use std::fmt::Display;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Column {
@@ -21,7 +25,9 @@ pub(crate) enum Statement {
         table_name: Identifier,
         alter_types: Vec<AlterType>,
     },
-    Drop,
+    Drop {
+        table_name: Identifier,
+    },
     // DML
     Insert,
     Update,
@@ -69,7 +75,7 @@ impl Display for Statement {
                 }
                 Ok(())
             }
-            Statement::Drop => write!(f, "DROP"),
+            Statement::Drop { table_name } => write!(f, "DROP TABLE {}", table_name),
             Statement::Insert => write!(f, "INSERT"),
             Statement::Update => write!(f, "UPDATE"),
             Statement::Delete => write!(f, "DELETE"),
