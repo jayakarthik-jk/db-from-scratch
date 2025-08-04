@@ -7,7 +7,7 @@ use crate::{
             error::{ParserError, ParserErrorKind},
         },
     },
-    match_token, unwrap_ok, unwrap_ident,
+    match_token, unwrap_ok,
     util::layer::Layer,
     Parser,
 };
@@ -19,7 +19,7 @@ where
     pub(crate) fn parse_create_statement(&mut self) -> Option<Result<Statement, ParserError>> {
         match_token!(self.get_next_token(), TokenKind::Keyword(Keyword::Table));
 
-        let table_name = unwrap_ok!(unwrap_ident!(self.get_next_token()));
+        let table_name = unwrap_ok!(match_token!(self.get_next_token(), TokenKind::Identifier(ident), ident));
 
         match_token!(
             self.get_next_token(),
@@ -41,7 +41,7 @@ where
     }
 
     pub(crate) fn parse_create_statement_column(&mut self) -> Option<Result<Column, ParserError>> {
-        let ident = unwrap_ok!(unwrap_ident!(self.get_next_token()));
+        let ident = unwrap_ok!(match_token!(self.get_next_token(), TokenKind::Identifier(ident), ident));
 
         let data_type_token = unwrap_ok!(self.get_next_token());
         let data_type = match data_type_token.kind {

@@ -1,6 +1,4 @@
-use crate::frontend::lexer::{
-    keyword::Keyword, token::TokenKind, LexerError, Token
-};
+use crate::frontend::lexer::{keyword::Keyword, token::TokenKind, LexerError, Token};
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct ParserError {
@@ -11,18 +9,13 @@ pub(crate) struct ParserError {
 pub(crate) enum ParserErrorKind {
     NotAnExpression,
     LexerError(LexerError),
-    KeywordExpected(Token),
-    UnexpectedToken {
-        expected: TokenKind,
-        found: Token,
-    },
+    // UnexpectedWithExpected {
+    //     expected: TokenKind,
+    //     found: Token,
+    // },
     Unexpected(Token),
     UnexpectedStatement,
-    TableNameExpected(Token),
-    UnExpectedAlterType {
-        expected: Keyword,
-        found: TokenKind,
-    },
+    UnExpectedAlterType { expected: Keyword, found: TokenKind },
     Custom(String),
 }
 

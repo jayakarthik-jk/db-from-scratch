@@ -3,7 +3,7 @@ pub(crate) mod error;
 pub(crate) mod expression;
 pub(crate) mod statements;
 
-use super::lexer::{keyword::Keyword, symbol::Symbol, token::TokenKind, LexerError, Token};
+use super::lexer::{keyword::Keyword, symbol::Symbol, token::{Identifier, TokenKind}, LexerError, Token};
 use crate::{match_token, unwrap_ok, util::layer::Layer};
 use error::{ParserError, ParserErrorKind};
 use expression::{AssignmentOperator, BinaryOperator, Expression};
@@ -23,14 +23,13 @@ where
     type Item = Result<Statement, ParserError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let token = unwrap_ok!(self.get_next_token());
-        let TokenKind::Keyword(keyword) = token.kind else {
-            return Some(Err(ParserErrorKind::KeywordExpected(token).into()));
-        };
+        let keyword = unwrap_ok!(match_token!(self.get_next_token(), TokenKind::Keyword(keyword), keyword));
+
         let statement = unwrap_ok!(match keyword {
             Keyword::Create => self.parse_create_statement(),
             Keyword::Alter => self.parse_alter_statement(),
             Keyword::Drop => self.parse_drop_statement(),
+            Keyword::Insert => self.parse_insert_statement(),
             Keyword::Select => self.parse_select_statement(),
             _ => return Some(Err(ParserErrorKind::UnexpectedStatement.into())),
         });
@@ -104,6 +103,7 @@ where
         if precedence == 0 {
             return self.parse_factor();
         }
+        
         let mut left = unwrap_ok!(self.parse_expression_of(precedence - 1));
 
         loop {
@@ -135,6 +135,13 @@ where
         }
 
         Some(Ok(left))
+    }
+
+    fn parse_identifier(&mut self) -> Option<Result<Identifier, ParserError>> {
+        match unwrap_ok!(self.get_next_token()) {
+            Token { kind: TokenKind::Identifier(ident), .. } => return Some(Ok(ident)),
+            token => Some(Err(ParserErrorKind::Unexpected(token).into()))
+        }
     }
 
     fn parse_factor(&mut self) -> Option<Result<Expression, ParserError>> {

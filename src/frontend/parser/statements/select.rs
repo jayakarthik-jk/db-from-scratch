@@ -3,7 +3,7 @@ use crate::{
     frontend::{
         lexer::{keyword::Keyword, symbol::Symbol, token::TokenKind, LexerError, Token},
         parser::error::ParserError,
-    }, unwrap_ident, unwrap_ok, util::layer::Layer, Parser
+    }, match_token, unwrap_ok, util::layer::Layer, Parser
 };
 
 impl<TokenLayer> Parser<TokenLayer>
@@ -22,7 +22,7 @@ where
             }));
         }
 
-        let table_name = unwrap_ok!(unwrap_ident!(self.get_next_token()));
+        let table_name = unwrap_ok!(match_token!(self.get_next_token(), TokenKind::Identifier(ident), ident));
 
         return Some(Ok(Statement::Select {
             select_expressions: expressions,

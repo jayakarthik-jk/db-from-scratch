@@ -19,6 +19,8 @@ pub(crate) enum Keyword {
     Rename,
     Column,
     To,
+    Into,
+    Values,
 }
 
 impl Keyword {
@@ -43,6 +45,8 @@ impl Keyword {
             "rename" => Keyword::Rename,
             "column" => Keyword::Column,
             "to" => Keyword::To,
+            "into" => Keyword::Into,
+            "values" => Keyword::Values,
             _ => return None,
         };
         return Some(keyword);

@@ -9,7 +9,7 @@ use crate::{
         },
         parser::error::{IntoParseResult, ParserError, ParserErrorKind},
     },
-    match_token, unwrap_ident, unwrap_ok,
+    match_token, unwrap_ok,
     util::layer::Layer,
     Parser,
 };
@@ -27,9 +27,9 @@ where
     TokenLayer: Layer<Token, LexerError>,
 {
     pub(crate) fn parse_alter_statement(&mut self) -> Option<Result<Statement, ParserError>> {
-        match_token!(self.get_next_token(), TokenKind::Keyword(Keyword::Table));
+        unwrap_ok!(match_token!(self.get_next_token(), TokenKind::Keyword(Keyword::Table)));
 
-        let table_name = unwrap_ok!(unwrap_ident!(self.get_next_token()));
+        let table_name = unwrap_ok!(match_token!(self.get_next_token(), TokenKind::Identifier(ident), ident));
 
         let alter_types =
             unwrap_ok!(self.parse_seperated(Symbol::Comma, |parser| parser.parse_alter_type()));

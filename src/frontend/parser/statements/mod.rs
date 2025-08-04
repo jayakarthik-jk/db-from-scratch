@@ -1,7 +1,8 @@
 pub(crate) mod alter;
 pub(crate) mod create;
-pub(crate) mod select;
 pub(crate) mod drop;
+pub(crate) mod insert;
+pub(crate) mod select;
 
 use super::{datatype::Datatype, expression::Expression};
 use crate::frontend::lexer::token::Identifier;
@@ -29,7 +30,11 @@ pub(crate) enum Statement {
         table_name: Identifier,
     },
     // DML
-    Insert,
+    Insert {
+        table_name: Identifier,
+        columns: Option<Vec<Identifier>>,
+        values: Vec<Expression>,
+    },
     Update,
     Delete,
     // DQL
@@ -76,7 +81,24 @@ impl Display for Statement {
                 Ok(())
             }
             Statement::Drop { table_name } => write!(f, "DROP TABLE {}", table_name),
-            Statement::Insert => write!(f, "INSERT"),
+            Statement::Insert {
+                table_name,
+                columns,
+                values,
+            } => {
+                write!(f, "INSERT INTO {}", table_name)?;
+                if let Some(cols) = columns {
+                    write!(f, " ({})", cols.join(", "))?;
+                }
+                write!(f, " VALUES (")?;
+                for (i, value) in values.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", value)?;
+                }
+                write!(f, ")")
+            }
             Statement::Update => write!(f, "UPDATE"),
             Statement::Delete => write!(f, "DELETE"),
             Statement::Select {
