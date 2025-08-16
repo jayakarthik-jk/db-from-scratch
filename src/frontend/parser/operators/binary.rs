@@ -72,31 +72,43 @@ impl BinaryOperator {
     where
         TokenLayer: Layer<Token, LexerError>,
     {
-        match parser.get_next_token()? {
+        let token = parser.get_next_token();
+        let token = match token {
+            Ok(token) => token,
             Err(err) => return Some(Err(err)),
-            Ok(Token {
+        };
+        match token {
+            Token {
                 kind: TokenKind::Symbol(symbol),
                 position,
-            }) => {
+            } => {
                 if let Some(operator) = Self::match_symbol_with_precedence(symbol, precedence) {
-                    return Some(Ok(operator));
+                    Some(Ok(operator))
                 } else {
                     parser.tokens.rewind(Token {
                         kind: TokenKind::Symbol(symbol),
                         position,
                     });
-                    return None;
+                    None
                 }
-            },
-            Ok(Token {
+            }
+            Token {
                 kind: TokenKind::Keyword(keyword),
                 position,
-            }) => {
+            } => {
                 let operator = match keyword {
-                    Keyword::And if BinaryOperator::And.precedence() == precedence => BinaryOperator::And,
-                    Keyword::Or if BinaryOperator::Or.precedence() == precedence => BinaryOperator::Or,
-                    Keyword::In if BinaryOperator::In.precedence() == precedence => BinaryOperator::In,
-                    Keyword::Like if BinaryOperator::Like.precedence() == precedence => BinaryOperator::Like,
+                    Keyword::And if BinaryOperator::And.precedence() == precedence => {
+                        BinaryOperator::And
+                    }
+                    Keyword::Or if BinaryOperator::Or.precedence() == precedence => {
+                        BinaryOperator::Or
+                    }
+                    Keyword::In if BinaryOperator::In.precedence() == precedence => {
+                        BinaryOperator::In
+                    }
+                    Keyword::Like if BinaryOperator::Like.precedence() == precedence => {
+                        BinaryOperator::Like
+                    }
                     keyword => {
                         parser.tokens.rewind(Token {
                             kind: TokenKind::Keyword(keyword),
@@ -104,14 +116,13 @@ impl BinaryOperator {
                         });
                         return None;
                     }
-
                 };
-                return Some(Ok(operator));
-            },
+                Some(Ok(operator))
+            }
 
-            Ok(token) => {
+            token => {
                 parser.tokens.rewind(token);
-                return None;
+                None
             }
         }
     }
@@ -122,7 +133,6 @@ impl BinaryOperator {
 
     pub(crate) const fn precedence(&self) -> u8 {
         match self {
-
             BinaryOperator::And => 5,
             BinaryOperator::Or => 5,
             BinaryOperator::In => 5,

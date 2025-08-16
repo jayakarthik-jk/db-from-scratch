@@ -1,5 +1,3 @@
-use super::row::NBytes;
-
 trait Serializable {
     fn serialize(self) -> Vec<u8>;
     fn deserialize(value: &[u8]) -> Self;

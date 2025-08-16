@@ -173,7 +173,7 @@ where
                     } else if let Some(literal) = Literal::get_literal(&word) {
                         Token::new(TokenKind::Literal(literal), ch.position)
                     } else {
-                        Token::new(TokenKind::Identifier(word), ch.position)
+                        Token::new(TokenKind::Ident(word), ch.position)
                     }
                 }
 

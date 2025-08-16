@@ -3,44 +3,36 @@ use crate::{
     frontend::{
         lexer::{keyword::Keyword, symbol::Symbol, token::TokenKind, LexerError, Token},
         parser::error::ParserError,
-    }, match_token, unwrap_ok, util::layer::Layer, Parser
+    },
+    util::layer::Layer,
+    Parser,
 };
 
 impl<TokenLayer> Parser<TokenLayer>
 where
     TokenLayer: Layer<Token, LexerError>,
 {
-    pub(crate) fn parse_select_statement(&mut self) -> Option<Result<Statement, ParserError>> {
-        let expressions = unwrap_ok!(self.parse_separated_expressions(Symbol::Comma));
+    pub(crate) fn parse_select_statement(&mut self) -> Result<Statement, ParserError> {
+        let expressions = self.parse_separated_expressions(Symbol::Comma)?;
 
-        let from_token = unwrap_ok!(self.get_next_token());
+        let from_token = self.get_next_token()?;
         if from_token.kind != TokenKind::Keyword(Keyword::From) {
             self.tokens.rewind(from_token);
-            return Some(Ok(Statement::Select {
+            return Ok(Statement::Select {
                 select_expressions: expressions,
                 from: None,
                 predicate: None,
-            }));
+            });
         }
 
-        let table_name = Some(unwrap_ok!(match_token!(self.get_next_token(), TokenKind::Identifier(ident), ident)));
+        let table_name = self.expected_identifier()?;
 
-        let mut predicate = None;
+        let predicate = self.parse_predicate()?;
 
-        match self.get_next_token()? {
-            Err(e) => return Some(Err(e)),
-            Ok(Token { kind: TokenKind::Keyword(Keyword::Where), .. }) => {
-                predicate = Some(unwrap_ok!(self.parse_expression()));
-            },
-            Ok(token) => {
-                self.tokens.rewind(token);
-            }
-        }
-
-        return Some(Ok(Statement::Select {
+        Ok(Statement::Select {
             select_expressions: expressions,
-            from: table_name,
+            from: Some(table_name),
             predicate,
-        }));
+        })
     }
 }

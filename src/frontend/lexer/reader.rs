@@ -57,67 +57,63 @@ impl<T: Read> Iterator for CharacterIterator<T> {
     type Item = Result<Character, ()>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            if self.cursor >= self.buffer.len() {
-                if !self.refill_buffer() {
-                    return None;
+        if self.cursor >= self.buffer.len() && !self.refill_buffer() {
+            return None;
+        }
+
+        let slice = &self.buffer[self.cursor..];
+        match std::str::from_utf8(slice) {
+            Ok(valid_str) => {
+                let ch = valid_str.chars().next()?;
+                let len = ch.len_utf8();
+
+                self.cursor += len;
+
+                match ch {
+                    '\n' => {
+                        self.position.row += 1;
+                        self.position.col = 0;
+                    }
+                    _ => {
+                        self.position.col += 1;
+                    }
                 }
+
+                Some(Ok(Character {
+                    value: ch,
+                    position: self.position,
+                }))
             }
-
-            let slice = &self.buffer[self.cursor..];
-            match std::str::from_utf8(slice) {
-                Ok(valid_str) => {
-                    let ch = valid_str.chars().next()?;
-                    let len = ch.len_utf8();
-
-                    self.cursor += len;
-
-                    match ch {
-                        '\n' => {
-                            self.position.row += 1;
-                            self.position.col = 0;
-                        }
-                        _ => {
-                            self.position.col += 1;
-                        }
-                    }
-
-                    return Some(Ok(Character {
-                        value: ch,
-                        position: self.position,
-                    }));
+            Err(e) => {
+                let valid_up_to = e.valid_up_to();
+                if valid_up_to == 0 {
+                    panic!("Invalid UTF-8 encountered in input");
                 }
-                Err(e) => {
-                    let valid_up_to = e.valid_up_to();
-                    if valid_up_to == 0 {
-                        panic!("Invalid UTF-8 encountered in input");
+
+                // Safe slice of valid UTF-8
+                let ch = std::str::from_utf8(&slice[..valid_up_to])
+                    .unwrap()
+                    .chars()
+                    .next()
+                    .unwrap();
+
+                let len = ch.len_utf8();
+                self.cursor += len;
+
+                match ch {
+                    '\n' => {
+                        self.position.row += 1;
+                        self.position.col = 0;
                     }
-
-                    // Safe slice of valid UTF-8
-                    let ch = std::str::from_utf8(&slice[..valid_up_to])
-                        .unwrap()
-                        .chars()
-                        .next()
-                        .unwrap();
-
-                    let len = ch.len_utf8();
-                    self.cursor += len;
-
-                    match ch {
-                        '\n' => {
-                            self.position.row += 1;
-                            self.position.col = 0;
-                        }
-                        _ => {
-                            self.position.col += 1;
-                        }
+                    _ => {
+                        self.position.col += 1;
                     }
-
-                    return Some(Ok(Character {
-                        value: ch,
-                        position: self.position,
-                    }));
                 }
+
+                Some(Ok(Character {
+                    value: ch,
+                    position: self.position,
+                }))
             }
         }
     }

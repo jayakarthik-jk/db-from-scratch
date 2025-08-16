@@ -4,12 +4,11 @@ use crate::{
         lexer::{
             keyword::Keyword,
             symbol::Symbol,
-            token::{Identifier, TokenKind},
+            token::{Ident, TokenKind},
             LexerError, Token,
         },
-        parser::error::{IntoParseResult, ParserError, ParserErrorKind},
+        parser::error::{IntoParseResult, ParserError},
     },
-    match_token, unwrap_ok,
     util::layer::Layer,
     Parser,
 };
@@ -17,73 +16,73 @@ use crate::{
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum AlterType {
     Add(Column),
-    Drop(Identifier),
+    Drop(Ident),
     Modify(Column),
-    Rename { old: Identifier, new: Identifier },
+    Rename { old: Ident, new: Ident },
 }
 
 impl<TokenLayer> Parser<TokenLayer>
 where
     TokenLayer: Layer<Token, LexerError>,
 {
-    pub(crate) fn parse_alter_statement(&mut self) -> Option<Result<Statement, ParserError>> {
-        unwrap_ok!(match_token!(self.get_next_token(), TokenKind::Keyword(Keyword::Table)));
+    pub(crate) fn parse_alter_statement(&mut self) -> Result<Statement, ParserError> {
+        self.expect(TokenKind::Keyword(Keyword::Table))?;
 
-        let table_name = unwrap_ok!(match_token!(self.get_next_token(), TokenKind::Identifier(ident), ident));
+        let table_name = self.expected_identifier()?;
 
         let alter_types =
-            unwrap_ok!(self.parse_seperated(Symbol::Comma, |parser| parser.parse_alter_type()));
+            self.parse_seperated(Symbol::Comma, |parser| parser.parse_alter_type())?;
 
-        return Some(Ok(Statement::Alter {
+        Ok(Statement::Alter {
             table_name,
             alter_types,
-        }));
+        })
     }
 
-    pub(crate) fn parse_alter_type(&mut self) -> Option<Result<AlterType, ParserError>> {
+    pub(crate) fn parse_alter_type(&mut self) -> Result<AlterType, ParserError> {
         let Token {
             kind: TokenKind::Keyword(keyword),
             ..
-        } = unwrap_ok!(self.get_next_token())
+        } = self.get_next_token()?
         else {
             return "Alter Type ADD, DROP, MODIFY, or RENAME expected".as_err();
         };
 
         let alter_type = match keyword {
             Keyword::Add => {
-                match_token!(self.get_next_token(), TokenKind::Keyword(Keyword::Column));
-                let column = unwrap_ok!(self.parse_create_statement_column());
+                self.expect(TokenKind::Keyword(Keyword::Column))?;
+                let column = self.parse_create_statement_column()?;
                 AlterType::Add(column)
             }
             Keyword::Drop => {
-                match_token!(self.get_next_token(), TokenKind::Keyword(Keyword::Column));
-                let column_name_token = unwrap_ok!(self.get_next_token());
-                if let TokenKind::Identifier(column_name) = column_name_token.kind {
+                self.expect(TokenKind::Keyword(Keyword::Column))?;
+                let column_name_token = self.get_next_token()?;
+                if let TokenKind::Ident(column_name) = column_name_token.kind {
                     AlterType::Drop(column_name)
                 } else {
                     return "Table name expected after DROP COLUMN".as_err();
                 }
             }
             Keyword::Modify => {
-                match_token!(self.get_next_token(), TokenKind::Keyword(Keyword::Column));
-                let column = unwrap_ok!(self.parse_create_statement_column());
+                self.expect(TokenKind::Keyword(Keyword::Column))?;
+                let column = self.parse_create_statement_column()?;
                 AlterType::Modify(column)
             }
             Keyword::Rename => {
-                match_token!(self.get_next_token(), TokenKind::Keyword(Keyword::Column));
-                let old_name_token = unwrap_ok!(self.get_next_token());
+                self.expect(TokenKind::Keyword(Keyword::Column))?;
+                let old_name_token = self.get_next_token()?;
                 let Token {
-                    kind: TokenKind::Identifier(old),
+                    kind: TokenKind::Ident(old),
                     ..
                 } = old_name_token
                 else {
                     return "Old column name expected after RENAME COLUMN".as_err();
                 };
-                match_token!(self.get_next_token(), TokenKind::Keyword(Keyword::To));
+                self.expect(TokenKind::Keyword(Keyword::To))?;
 
-                let new_name_token = unwrap_ok!(self.get_next_token());
+                let new_name_token = self.get_next_token()?;
                 let Token {
-                    kind: TokenKind::Identifier(new),
+                    kind: TokenKind::Ident(new),
                     ..
                 } = new_name_token
                 else {
@@ -93,14 +92,13 @@ where
             }
 
             keyword => {
-                return Some(Err(ParserErrorKind::UnExpectedAlterType {
+                return Err(ParserError::UnExpectedAlterType {
                     expected: Keyword::Add,
                     found: TokenKind::Keyword(keyword),
-                }
-                .into()))
+                })
             }
         };
 
-        Some(Ok(alter_type))
+        Ok(alter_type)
     }
 }

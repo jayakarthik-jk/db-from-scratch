@@ -203,7 +203,8 @@ fn select_with_predicate_and_or_and() {
 
 #[test]
 fn select_with_predicate_and_or_and_2() {
-    let command = "select id, name from users where (id == 1 and name == 'Alice') or name == 'Bob';";
+    let command =
+        "select id, name from users where (id == 1 and name == 'Alice') or name == 'Bob';";
     let mut statements = parse_statement(command);
     assert_eq!(statements.len(), 1, "Expected one statement to be parsed");
     let select = Statement::Select {

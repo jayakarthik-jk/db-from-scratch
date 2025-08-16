@@ -65,7 +65,7 @@ impl Keyword {
             "set" => Keyword::Set,
             _ => return None,
         };
-        return Some(keyword);
+        Some(keyword)
     }
 }
 

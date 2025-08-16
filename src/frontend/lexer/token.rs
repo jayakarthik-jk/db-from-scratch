@@ -5,7 +5,7 @@ pub(crate) enum TokenKind {
     Keyword(Keyword),
     Symbol(Symbol),
     Literal(Literal),
-    Identifier(Identifier),
+    Ident(Ident),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -26,4 +26,4 @@ impl Token {
     }
 }
 
-pub(crate) type Identifier = String;
+pub(crate) type Ident = String;

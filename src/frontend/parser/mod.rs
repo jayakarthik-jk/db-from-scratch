@@ -7,11 +7,11 @@ pub(crate) mod statements;
 use super::lexer::{
     keyword::Keyword,
     symbol::Symbol,
-    token::{Identifier, TokenKind},
+    token::{Ident, TokenKind},
     LexerError, Token,
 };
-use crate::{match_token, unwrap_ok, util::layer::Layer};
-use error::{ParserError, ParserErrorKind};
+use crate::util::layer::Layer;
+use error::ParserError;
 use expression::Expression;
 use operators::binary::BinaryOperator;
 use statements::Statement;
@@ -30,13 +30,12 @@ where
     type Item = Result<Statement, ParserError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let keyword = unwrap_ok!(match_token!(
-            self.get_next_token(),
-            TokenKind::Keyword(keyword),
-            keyword
-        ));
+        let keyword = match self.expect_keyword_kind() {
+            Ok(keyword) => keyword,
+            Err(err) => return Some(Err(err)),
+        };
 
-        let statement = unwrap_ok!(match keyword {
+        let statement = match keyword {
             Keyword::Create => self.parse_create_statement(),
             Keyword::Alter => self.parse_alter_statement(),
             Keyword::Drop => self.parse_drop_statement(),
@@ -44,10 +43,18 @@ where
             Keyword::Select => self.parse_select_statement(),
             Keyword::Update => self.parse_update_statement(),
             Keyword::Delete => self.parse_delete_statement(),
-            _ => return Some(Err(ParserErrorKind::UnexpectedStatement.into())),
-        });
+            _ => return Some(Err(ParserError::UnexpectedStatement)),
+        };
 
-        match_token!(self.get_next_token(), TokenKind::Symbol(Symbol::Semicolon));
+        let statement = match statement {
+            Err(err) => return Some(Err(err)),
+            Ok(stmt) => stmt,
+        };
+
+        if let Err(err) = self.expect(TokenKind::Symbol(Symbol::Semicolon)) {
+            return Some(Err(err));
+        }
+
         Some(Ok(statement))
     }
 }
@@ -60,42 +67,87 @@ where
         Self { tokens }
     }
 
-    fn get_next_token(&mut self) -> Option<Result<Token, ParserError>> {
-        Some(
-            self.tokens
-                .next()?
-                .map_err(|err| ParserErrorKind::LexerError(err).into()),
-        )
+    fn get_next_token(&mut self) -> Result<Token, ParserError> {
+        self.tokens
+            .next()
+            .ok_or(ParserError::Eof)?
+            .map_err(ParserError::LexerError)
     }
 
-    fn parse_expression(&mut self) -> Option<Result<Expression, ParserError>> {
+    fn expect(&mut self, expected: TokenKind) -> Result<(), ParserError> {
+        match self.get_next_token()? {
+            Token { kind: actual, .. } if expected == actual => Ok(()),
+            token => Err(ParserError::Unexpected {
+                found: token,
+                expected,
+            }),
+        }
+    }
+
+    fn expect_keyword_kind(&mut self) -> Result<Keyword, ParserError> {
+        match self.get_next_token()? {
+            Token {
+                kind: TokenKind::Keyword(keyword),
+                ..
+            } => Ok(keyword),
+            token => Err(ParserError::KeywordExpected(token)),
+        }
+    }
+
+    fn expected_identifier(&mut self) -> Result<Ident, ParserError> {
+        match self.get_next_token()? {
+            Token {
+                kind: TokenKind::Ident(ident),
+                ..
+            } => Ok(ident),
+            token => Err(ParserError::IdentExpected(token)),
+        }
+    }
+
+    fn parse_predicate(&mut self) -> Result<Option<Expression>, ParserError> {
+        let mut predicate = None;
+        match self.get_next_token()? {
+            Token {
+                kind: TokenKind::Keyword(Keyword::Where),
+                ..
+            } => {
+                predicate = Some(self.parse_expression()?);
+            }
+            token => {
+                self.tokens.rewind(token);
+            }
+        }
+        Ok(predicate)
+    }
+
+    fn parse_expression(&mut self) -> Result<Expression, ParserError> {
         self.parse_expression_of(BinaryOperator::max_precedence())
     }
 
-    fn parse_expression_of(&mut self, precedence: u8) -> Option<Result<Expression, ParserError>> {
+    fn parse_expression_of(&mut self, precedence: u8) -> Result<Expression, ParserError> {
         if precedence == 0 {
             return self.parse_factor();
         }
 
         // Handle NOT operator
-        let token = unwrap_ok!(self.get_next_token());
+        let token = self.get_next_token()?;
         if let TokenKind::Keyword(Keyword::Not) = token.kind {
-            let next_expression = unwrap_ok!(self.parse_expression_of(precedence - 1));
-            return Some(Ok(Expression::Negation(Box::new(next_expression))));
+            let next_expression = self.parse_expression_of(precedence - 1)?;
+            return Ok(Expression::Negation(Box::new(next_expression)));
         } else {
             self.tokens.rewind(token);
         }
 
-        let mut left = unwrap_ok!(self.parse_expression_of(precedence - 1));
+        let mut left = self.parse_expression_of(precedence - 1)?;
 
         loop {
             let binary_operator = match BinaryOperator::parse_binary_operator(self, precedence) {
                 Some(Ok(operator)) => operator,
-                Some(Err(err)) => return Some(Err(err)),
+                Some(Err(err)) => return Err(err),
                 None => break,
             };
 
-            let right = unwrap_ok!(self.parse_expression_of(precedence - 1));
+            let right = self.parse_expression_of(precedence - 1)?;
 
             left = Expression::Binary {
                 left: Box::new(left),
@@ -104,62 +156,52 @@ where
             }
         }
 
-        Some(Ok(left))
+        Ok(left)
     }
 
-    fn parse_identifier(&mut self) -> Option<Result<Identifier, ParserError>> {
-        match unwrap_ok!(self.get_next_token()) {
+    fn expect_ident(&mut self) -> Result<Ident, ParserError> {
+        match self.get_next_token()? {
             Token {
-                kind: TokenKind::Identifier(ident),
+                kind: TokenKind::Ident(ident),
                 ..
-            } => return Some(Ok(ident)),
-            token => Some(Err(ParserErrorKind::Unexpected(token).into())),
+            } => Ok(ident),
+            token => Err(ParserError::IdentExpected(token)),
         }
     }
 
-    fn parse_factor(&mut self) -> Option<Result<Expression, ParserError>> {
-        let token = unwrap_ok!(self.get_next_token());
+    fn parse_factor(&mut self) -> Result<Expression, ParserError> {
+        let token = self.get_next_token()?;
         match token.kind {
-            TokenKind::Literal(literal) => Some(Ok(Expression::Literal(literal))),
-            TokenKind::Identifier(ident) => {
-                let next_token = unwrap_ok!(self.get_next_token());
+            TokenKind::Literal(literal) => Ok(Expression::Literal(literal)),
+            TokenKind::Ident(ident) => {
+                let next_token = self.get_next_token()?;
                 if let TokenKind::Symbol(Symbol::OpenParanthesis) = next_token.kind {
                     // Function call
-                    let expressions = unwrap_ok!(self.parse_separated_expressions(Symbol::Comma));
-                    let close_paren_token = unwrap_ok!(self.get_next_token());
-                    if close_paren_token.kind != TokenKind::Symbol(Symbol::CloseParanthesis) {
-                        return Some(Err(ParserErrorKind::Unexpected(close_paren_token).into()));
-                    }
-                    return Some(Ok(Expression::FunctionCall {
+                    let expressions = self.parse_separated_expressions(Symbol::Comma)?;
+                    self.expect(TokenKind::Symbol(Symbol::CloseParanthesis))?;
+                    Ok(Expression::FunctionCall {
                         ident,
                         arguments: expressions,
-                    }));
+                    })
                 } else {
                     // Just an identifier
                     self.tokens.rewind(next_token);
-                    return Some(Ok(Expression::Identifier(ident)));
+                    Ok(Expression::Identifier(ident))
                 }
             }
             TokenKind::Symbol(Symbol::OpenParanthesis) => {
-                let expression = unwrap_ok!(self.parse_expression());
-
-                Some(match self.get_next_token()? {
-                    Ok(Token {
-                        kind: TokenKind::Symbol(Symbol::CloseParanthesis),
-                        ..
-                    }) => Ok(expression),
-                    Ok(token) => Err(ParserErrorKind::Unexpected(token).into()),
-                    Err(err) => Err(err),
-                })
+                let expression = self.parse_expression()?;
+                self.expect(TokenKind::Symbol(Symbol::CloseParanthesis))?;
+                Ok(expression)
             }
             TokenKind::Symbol(Symbol::Star) => {
                 // This is a special case for `SELECT *`
                 // We treat it as a wildcard expression
-                Some(Ok(Expression::Wildcard))
+                Ok(Expression::Wildcard)
             }
             _ => {
                 self.tokens.rewind(token);
-                Some(Err(ParserErrorKind::NotAnExpression.into()))
+                Err(ParserError::NotAnExpression)
             }
         }
     }
@@ -167,7 +209,7 @@ where
     fn parse_separated_expressions(
         &mut self,
         separator: Symbol,
-    ) -> Option<Result<Vec<Expression>, ParserError>> {
+    ) -> Result<Vec<Expression>, ParserError> {
         self.parse_seperated(separator, |parser| parser.parse_expression())
     }
 
@@ -175,17 +217,17 @@ where
         &mut self,
         separator: Symbol,
         callback: Callback,
-    ) -> Option<Result<Vec<ReturnType>, ParserError>>
+    ) -> Result<Vec<ReturnType>, ParserError>
     where
-        Callback: Fn(&mut Self) -> Option<Result<ReturnType, ParserError>>,
+        Callback: Fn(&mut Self) -> Result<ReturnType, ParserError>,
     {
         let mut expressions = Vec::new();
 
         loop {
-            let expr = unwrap_ok!(callback(self));
+            let expr = callback(self)?;
             expressions.push(expr);
             // Ensure separator before each expression
-            let token = unwrap_ok!(self.get_next_token());
+            let token = self.get_next_token()?;
 
             if let TokenKind::Symbol(symbol) = token.kind {
                 if symbol == separator {
@@ -196,6 +238,6 @@ where
             break;
         }
 
-        Some(Ok(expressions))
+        Ok(expressions)
     }
 }

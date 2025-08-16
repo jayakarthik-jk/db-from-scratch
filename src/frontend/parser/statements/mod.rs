@@ -1,20 +1,20 @@
 pub(crate) mod alter;
 pub(crate) mod create;
+pub(crate) mod delete;
 pub(crate) mod drop;
 pub(crate) mod insert;
-pub(crate) mod update;
 pub(crate) mod select;
-pub(crate) mod delete;
+pub(crate) mod update;
 
 use super::{datatype::Datatype, expression::Expression};
-use crate::frontend::lexer::token::Identifier;
+use crate::frontend::lexer::token::Ident;
 use alter::AlterType;
-use update::UpdateSet;
 use std::fmt::Display;
+use update::UpdateSet;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Column {
-    pub name: Identifier,
+    pub name: Ident,
     pub data_type: Datatype,
 }
 
@@ -22,35 +22,35 @@ pub(crate) struct Column {
 pub(crate) enum Statement {
     // DDL
     Create {
-        table_name: Identifier,
+        table_name: Ident,
         columns: Vec<Column>,
     },
     Alter {
-        table_name: Identifier,
+        table_name: Ident,
         alter_types: Vec<AlterType>,
     },
     Drop {
-        table_name: Identifier,
+        table_name: Ident,
     },
     // DML
     Insert {
-        table_name: Identifier,
-        columns: Option<Vec<Identifier>>,
+        table_name: Ident,
+        columns: Option<Vec<Ident>>,
         values: Vec<Expression>,
     },
     Update {
-        table_name: Identifier,
+        table_name: Ident,
         set: Vec<UpdateSet>,
         predicate: Option<Expression>,
     },
     Delete {
-        table_name: Identifier,
+        table_name: Ident,
         predicate: Option<Expression>,
     },
     // DQL
     Select {
         select_expressions: Vec<Expression>,
-        from: Option<Identifier>,
+        from: Option<Ident>,
         predicate: Option<Expression>,
     },
 }
@@ -126,7 +126,7 @@ impl Display for Statement {
                     write!(f, " WHERE {}", pred)?;
                 }
                 Ok(())
-            },
+            }
             Statement::Delete {
                 table_name,
                 predicate,

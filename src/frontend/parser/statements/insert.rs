@@ -2,9 +2,8 @@ use super::Statement;
 use crate::{
     frontend::{
         lexer::{keyword::Keyword, symbol::Symbol, token::TokenKind, LexerError, Token},
-        parser::error::{ParserError, ParserErrorKind},
+        parser::error::ParserError,
     },
-    match_token, unwrap_ok,
     util::layer::Layer,
     Parser,
 };
@@ -13,38 +12,35 @@ impl<TokenLayer> Parser<TokenLayer>
 where
     TokenLayer: Layer<Token, LexerError>,
 {
-    pub(crate) fn parse_insert_statement(&mut self) -> Option<Result<Statement, ParserError>> {
-        match_token!(self.get_next_token(), TokenKind::Keyword(Keyword::Into));
+    pub(crate) fn parse_insert_statement(&mut self) -> Result<Statement, ParserError> {
+        self.expect(TokenKind::Keyword(Keyword::Into))?;
 
-        let table_name = unwrap_ok!(match_token!(self.get_next_token(), TokenKind::Identifier(ident), ident));
+        let table_name = self.expected_identifier()?;
 
         let mut columns = None;
 
-        let token = unwrap_ok!(self.get_next_token());
+        let token = self.get_next_token()?;
 
         if let TokenKind::Symbol(Symbol::OpenParanthesis) = token.kind {
             let column_names =
-                unwrap_ok!(self.parse_seperated(Symbol::Comma, |parser| parser.parse_identifier()));
-            match_token!(
-                self.get_next_token(),
-                TokenKind::Symbol(Symbol::CloseParanthesis)
-            );
+                self.parse_seperated(Symbol::Comma, |parser| parser.expect_ident())?;
+            self.expect(TokenKind::Symbol(Symbol::CloseParanthesis))?;
             columns = Some(column_names);
         } else {
             self.tokens.rewind(token);
         }
 
-        match_token!(self.get_next_token(), TokenKind::Keyword(Keyword::Values));
-        match_token!(self.get_next_token(), TokenKind::Symbol(Symbol::OpenParanthesis));
+        self.expect(TokenKind::Keyword(Keyword::Values))?;
+        self.expect(TokenKind::Symbol(Symbol::OpenParanthesis))?;
 
-        let values =
-            unwrap_ok!(self.parse_seperated(Symbol::Comma, |parser| parser.parse_expression()));
+        let values = self.parse_seperated(Symbol::Comma, |parser| parser.parse_expression())?;
 
-        match_token!(self.get_next_token(), TokenKind::Symbol(Symbol::CloseParanthesis));
-        Some(Ok(Statement::Insert {
+        self.expect(TokenKind::Symbol(Symbol::CloseParanthesis))?;
+
+        Ok(Statement::Insert {
             table_name,
             columns,
             values,
-        }))
+        })
     }
 }

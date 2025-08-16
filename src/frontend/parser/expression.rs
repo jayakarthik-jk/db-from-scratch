@@ -1,14 +1,14 @@
 use super::operators::binary::BinaryOperator;
-use crate::frontend::lexer::{literal::Literal, token::Identifier};
+use crate::frontend::lexer::{literal::Literal, token::Ident};
 use std::fmt::Display;
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum Expression {
     Wildcard,
     Literal(Literal),
-    Identifier(Identifier),
+    Identifier(Ident),
     FunctionCall {
-        ident: Identifier,
+        ident: Ident,
         arguments: Vec<Expression>,
     },
     Binary {

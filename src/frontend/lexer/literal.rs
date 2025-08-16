@@ -25,29 +25,29 @@ impl Display for Literal {
 
 impl From<&str> for Literal {
     fn from(value: &str) -> Self {
-        return Self::String(value.to_string());
+        Self::String(value.to_string())
     }
 }
 
 impl From<String> for Literal {
     fn from(value: String) -> Self {
-        return Self::String(value);
+        Self::String(value)
     }
 }
 
 impl From<i32> for Literal {
     fn from(value: i32) -> Self {
-        return Self::Integer(value);
+        Self::Integer(value)
     }
 }
 impl From<bool> for Literal {
     fn from(value: bool) -> Self {
-        return Self::Boolean(value);
+        Self::Boolean(value)
     }
 }
 impl From<f64> for Literal {
     fn from(value: f64) -> Self {
-        return Self::Float(value);
+        Self::Float(value)
     }
 }
 
@@ -58,6 +58,6 @@ impl Literal {
             "false" => Literal::Boolean(false),
             _ => return None,
         };
-        return Some(keyword);
+        Some(keyword)
     }
 }
