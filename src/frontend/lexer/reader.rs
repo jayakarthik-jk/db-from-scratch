@@ -1,4 +1,7 @@
-use std::io::{BufReader, Read};
+use std::{
+    io::{BufReader, Read},
+    ops::Add,
+};
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub(crate) struct Character {
@@ -8,13 +11,24 @@ pub(crate) struct Character {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Position {
-    pub row: usize,
-    pub col: usize,
+    pub(crate) row: usize,
+    pub(crate) col: usize,
 }
 
 impl Default for Position {
     fn default() -> Self {
         Self { row: 1, col: 0 }
+    }
+}
+
+impl Add<usize> for Position {
+    type Output = Self;
+
+    fn add(self, rhs: usize) -> Self::Output {
+        Self {
+            row: self.row,
+            col: self.col + rhs,
+        }
     }
 }
 

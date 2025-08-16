@@ -80,21 +80,18 @@ impl BinaryOperator {
         match token {
             Token {
                 kind: TokenKind::Symbol(symbol),
-                position,
+                ..
             } => {
                 if let Some(operator) = Self::match_symbol_with_precedence(symbol, precedence) {
                     Some(Ok(operator))
                 } else {
-                    parser.tokens.rewind(Token {
-                        kind: TokenKind::Symbol(symbol),
-                        position,
-                    });
+                    parser.tokens.rewind(token);
                     None
                 }
             }
             Token {
                 kind: TokenKind::Keyword(keyword),
-                position,
+                ..
             } => {
                 let operator = match keyword {
                     Keyword::And if BinaryOperator::And.precedence() == precedence => {
@@ -109,11 +106,8 @@ impl BinaryOperator {
                     Keyword::Like if BinaryOperator::Like.precedence() == precedence => {
                         BinaryOperator::Like
                     }
-                    keyword => {
-                        parser.tokens.rewind(Token {
-                            kind: TokenKind::Keyword(keyword),
-                            position,
-                        });
+                    _ => {
+                        parser.tokens.rewind(token);
                         return None;
                     }
                 };

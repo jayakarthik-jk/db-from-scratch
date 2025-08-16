@@ -32,6 +32,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let keyword = match self.expect_keyword_kind() {
             Ok(keyword) => keyword,
+            Err(ParserError::Eof) => return None,
             Err(err) => return Some(Err(err)),
         };
 
@@ -46,16 +47,27 @@ where
             _ => return Some(Err(ParserError::UnexpectedStatement)),
         };
 
-        let statement = match statement {
-            Err(err) => return Some(Err(err)),
-            Ok(stmt) => stmt,
-        };
+        match &statement {
+            Err(ParserError::Eof) => None,
 
-        if let Err(err) = self.expect(TokenKind::Symbol(Symbol::Semicolon)) {
-            return Some(Err(err));
+            // traverse the tokens until the next Semicolon
+            Err(_) => {
+                while let Ok(token) = self.get_next_token() {
+                    if token.kind == TokenKind::Symbol(Symbol::Semicolon) {
+                        break;
+                    }
+                }
+                Some(statement)
+            }
+
+            Ok(_) => Some(match self.expect(TokenKind::Symbol(Symbol::Semicolon)) {
+                Ok(_) => statement,
+                Err(ParserError::Eof) => Err(ParserError::UnexpectedToken {
+                    expected: TokenKind::Symbol(Symbol::Semicolon),
+                }),
+                Err(err) => Err(err),
+            }),
         }
-
-        Some(Ok(statement))
     }
 }
 

@@ -11,17 +11,37 @@ pub(crate) enum TokenKind {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Token {
     pub(crate) kind: TokenKind,
-    pub(crate) position: Position,
+    pub(crate) span: Span,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Span {
+    pub(crate) start: Position,
+    pub(crate) end: Position,
+}
+
 impl Token {
-    pub(crate) fn new(kind: TokenKind, position: Position) -> Self {
-        Self { kind, position }
+    pub(crate) fn new(kind: TokenKind, span: Span) -> Self {
+        Self { kind, span }
+    }
+
+    pub(crate) fn from_keyword(keyword: Keyword, position: Position) -> Self {
+        Self {
+            kind: TokenKind::Keyword(keyword),
+            span: Span {
+                start: position,
+                end: position + keyword.to_string().len(),
+            },
+        }
     }
 
     pub(crate) fn from_symbol(symbol: Symbol, position: Position) -> Self {
         Self {
             kind: TokenKind::Symbol(symbol),
-            position,
+            span: Span {
+                start: position,
+                end: position + symbol.to_string().len(),
+            },
         }
     }
 }

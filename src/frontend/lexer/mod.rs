@@ -4,20 +4,15 @@ pub(crate) mod reader;
 pub(crate) mod symbol;
 pub(crate) mod token;
 
+use std::fmt::Display;
+
 use crate::util::layer::Layer;
 use keyword::Keyword;
 use literal::Literal;
 use reader::{Character, Position};
 use symbol::Symbol;
 pub(crate) use token::Token;
-use token::TokenKind;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum LexerError {
-    UnTerminatedStringLiteral(Position),
-    NumberExceededSize(Position),
-    IllegalCharacter(char, Position),
-}
+use token::{Span, TokenKind};
 
 pub(crate) struct Lexer<CharacterLayer>
 where
@@ -82,7 +77,10 @@ where
                         if next_ch.value == '\"' {
                             return Some(Ok(Token::new(
                                 TokenKind::Literal(word.into()),
-                                ch.position,
+                                Span {
+                                    start: ch.position,
+                                    end: next_ch.position,
+                                },
                             )));
                         } else if next_ch.value == '\n' || next_ch.value == '\r' {
                             return Some(Err(LexerError::UnTerminatedStringLiteral(ch.position)));
@@ -97,7 +95,10 @@ where
                         if next_ch.value == '\'' {
                             return Some(Ok(Token::new(
                                 TokenKind::Literal(word.into()),
-                                ch.position,
+                                Span {
+                                    start: ch.position,
+                                    end: next_ch.position,
+                                },
                             )));
                         } else if next_ch.value == '\n' || next_ch.value == '\r' {
                             return Some(Err(LexerError::UnTerminatedStringLiteral(ch.position)));
@@ -158,6 +159,7 @@ where
                 // Identifiers and keywords
                 ch_val if ch_val.is_ascii_alphabetic() || ch_val == '_' => {
                     let mut word = String::from(ch_val);
+                    let mut last_position = ch.position;
                     while let Some(next_ch) = self.next_character() {
                         if next_ch.value == ' ' {
                             break;
@@ -166,20 +168,34 @@ where
                             self.characters.rewind(next_ch);
                             break;
                         }
+                        last_position = next_ch.position;
                         word.push(next_ch.value);
                     }
                     if let Some(keyword) = Keyword::get_keyword_kind(&word) {
-                        Token::new(TokenKind::Keyword(keyword), ch.position)
+                        Token::from_keyword(keyword, ch.position)
                     } else if let Some(literal) = Literal::get_literal(&word) {
-                        Token::new(TokenKind::Literal(literal), ch.position)
+                        Token::new(
+                            TokenKind::Literal(literal),
+                            Span {
+                                start: ch.position,
+                                end: last_position,
+                            },
+                        )
                     } else {
-                        Token::new(TokenKind::Ident(word), ch.position)
+                        Token::new(
+                            TokenKind::Ident(word),
+                            Span {
+                                start: ch.position,
+                                end: last_position,
+                            },
+                        )
                     }
                 }
 
                 // Numeric Literals
                 ch_val if ch_val.is_ascii_digit() => {
                     let mut number_as_string = String::from(ch_val);
+                    let mut last_position = ch.position;
 
                     // Collect the integer part of the number.
                     while let Some(next_ch) = self.next_character() {
@@ -189,29 +205,41 @@ where
                             // Handle fractional part
                             number_as_string.push('.');
                             while let Some(fraction_ch) = self.next_character() {
-                                if fraction_ch.value.is_ascii_digit() {
-                                    number_as_string.push(fraction_ch.value);
-                                } else {
+                                if !fraction_ch.value.is_ascii_digit() {
                                     self.characters.rewind(fraction_ch);
                                     break;
                                 }
+                                number_as_string.push(fraction_ch.value);
+                                last_position = fraction_ch.position;
                             }
+
                             // Parse as a floating-point number.
                             return Some(match number_as_string.parse::<f64>() {
-                                Ok(number) => {
-                                    Ok(Token::new(TokenKind::Literal(number.into()), ch.position))
-                                }
+                                Ok(number) => Ok(Token::new(
+                                    TokenKind::Literal(number.into()),
+                                    Span {
+                                        start: ch.position,
+                                        end: last_position,
+                                    },
+                                )),
                                 Err(_) => Err(LexerError::NumberExceededSize(ch.position)),
                             });
                         } else {
                             self.characters.rewind(next_ch);
                             break;
                         }
+                        last_position = next_ch.position;
                     }
 
                     // Parse as an integer if no fractional part.
                     match number_as_string.parse::<i32>() {
-                        Ok(number) => Token::new(TokenKind::Literal(number.into()), ch.position),
+                        Ok(number) => Token::new(
+                            TokenKind::Literal(number.into()),
+                            Span {
+                                start: ch.position,
+                                end: last_position,
+                            },
+                        ),
                         Err(_) => return Some(Err(LexerError::NumberExceededSize(ch.position))),
                     }
                 }
@@ -222,5 +250,28 @@ where
             return Some(Ok(token));
         }
         None
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LexerError {
+    UnTerminatedStringLiteral(Position),
+    NumberExceededSize(Position),
+    IllegalCharacter(char, Position),
+}
+
+impl Display for LexerError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LexerError::UnTerminatedStringLiteral(pos) => {
+                write!(f, "Unterminated string literal at position: {:?}", pos)
+            }
+            LexerError::NumberExceededSize(pos) => {
+                write!(f, "Number exceeded size limit at position: {:?}", pos)
+            }
+            LexerError::IllegalCharacter(ch, pos) => {
+                write!(f, "Illegal character '{}' at position: {:?}", ch, pos)
+            }
+        }
     }
 }
