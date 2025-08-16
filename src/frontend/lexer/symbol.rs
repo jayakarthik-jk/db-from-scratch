@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub(crate) enum Symbol {
     OpenParanthesis,
     CloseParanthesis,
@@ -46,6 +46,7 @@ pub(crate) enum Symbol {
     BitOr,
     BitNot,
     BitXor,
+    Carret,
 }
 
 impl Display for Symbol {
@@ -67,6 +68,8 @@ impl Display for Symbol {
             Symbol::Star => "*",
             Symbol::Divide => "/",
             Symbol::Percent => "%",
+            Symbol::Carret => "^",
+
             // assignment
             Symbol::Equal => "=",
             Symbol::PlusEquals => "+=",

@@ -1,12 +1,19 @@
 pub(crate) mod datatype;
 pub(crate) mod error;
 pub(crate) mod expression;
+pub(crate) mod operators;
 pub(crate) mod statements;
 
-use super::lexer::{keyword::Keyword, symbol::Symbol, token::{Identifier, TokenKind}, LexerError, Token};
+use super::lexer::{
+    keyword::Keyword,
+    symbol::Symbol,
+    token::{Identifier, TokenKind},
+    LexerError, Token,
+};
 use crate::{match_token, unwrap_ok, util::layer::Layer};
 use error::{ParserError, ParserErrorKind};
-use expression::{AssignmentOperator, BinaryOperator, Expression};
+use expression::Expression;
+use operators::binary::BinaryOperator;
 use statements::Statement;
 
 pub(crate) struct Parser<TokenLayer>
@@ -23,7 +30,11 @@ where
     type Item = Result<Statement, ParserError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let keyword = unwrap_ok!(match_token!(self.get_next_token(), TokenKind::Keyword(keyword), keyword));
+        let keyword = unwrap_ok!(match_token!(
+            self.get_next_token(),
+            TokenKind::Keyword(keyword),
+            keyword
+        ));
 
         let statement = unwrap_ok!(match keyword {
             Keyword::Create => self.parse_create_statement(),
@@ -31,6 +42,8 @@ where
             Keyword::Drop => self.parse_drop_statement(),
             Keyword::Insert => self.parse_insert_statement(),
             Keyword::Select => self.parse_select_statement(),
+            Keyword::Update => self.parse_update_statement(),
+            Keyword::Delete => self.parse_delete_statement(),
             _ => return Some(Err(ParserErrorKind::UnexpectedStatement.into())),
         });
 
@@ -55,46 +68,6 @@ where
         )
     }
 
-    #[allow(dead_code)]
-    /// <ident> <assignment_operator> <expression>
-    fn parse_assignment_expression(&mut self) -> Option<Result<Expression, ParserError>> {
-        // TODO
-        let first = unwrap_ok!(self.get_next_token());
-
-        let ident = match &first.kind {
-            TokenKind::Identifier(ident) => ident.to_owned(),
-            _ => {
-                self.tokens.rewind(first);
-                return self.parse_expression();
-            }
-        };
-
-        let second = unwrap_ok!(self.get_next_token());
-
-        let symbol = match second.kind {
-            TokenKind::Symbol(symbol) => symbol,
-            _ => {
-                self.tokens.rewind(second);
-                self.tokens.rewind(first);
-                return self.parse_expression();
-            }
-        };
-
-        let Some(assignment_operator) = AssignmentOperator::match_symbol(symbol) else {
-            self.tokens.rewind(second);
-            self.tokens.rewind(first);
-            return self.parse_expression();
-        };
-
-        let expression = unwrap_ok!(self.parse_expression());
-
-        Some(Ok(Expression::Assign {
-            ident,
-            operator: assignment_operator,
-            right: Box::new(expression),
-        }))
-    }
-
     fn parse_expression(&mut self) -> Option<Result<Expression, ParserError>> {
         self.parse_expression_of(BinaryOperator::max_precedence())
     }
@@ -103,27 +76,24 @@ where
         if precedence == 0 {
             return self.parse_factor();
         }
-        
+
+        // Handle NOT operator
+        let token = unwrap_ok!(self.get_next_token());
+        if let TokenKind::Keyword(Keyword::Not) = token.kind {
+            let next_expression = unwrap_ok!(self.parse_expression_of(precedence - 1));
+            return Some(Ok(Expression::Negation(Box::new(next_expression))));
+        } else {
+            self.tokens.rewind(token);
+        }
+
         let mut left = unwrap_ok!(self.parse_expression_of(precedence - 1));
 
         loop {
-            let token = unwrap_ok!(self.get_next_token());
-            let symbol = match token.kind {
-                TokenKind::Symbol(symbol) => symbol,
-                _ => {
-                    self.tokens.rewind(token);
-                    break;
-                }
+            let binary_operator = match BinaryOperator::parse_binary_operator(self, precedence) {
+                Some(Ok(operator)) => operator,
+                Some(Err(err)) => return Some(Err(err)),
+                None => break,
             };
-
-            let binary_operator =
-                match BinaryOperator::match_symbol_with_precedence(symbol, precedence) {
-                    Some(operator) => operator,
-                    _ => {
-                        self.tokens.rewind(token);
-                        break;
-                    }
-                };
 
             let right = unwrap_ok!(self.parse_expression_of(precedence - 1));
 
@@ -139,8 +109,11 @@ where
 
     fn parse_identifier(&mut self) -> Option<Result<Identifier, ParserError>> {
         match unwrap_ok!(self.get_next_token()) {
-            Token { kind: TokenKind::Identifier(ident), .. } => return Some(Ok(ident)),
-            token => Some(Err(ParserErrorKind::Unexpected(token).into()))
+            Token {
+                kind: TokenKind::Identifier(ident),
+                ..
+            } => return Some(Ok(ident)),
+            token => Some(Err(ParserErrorKind::Unexpected(token).into())),
         }
     }
 

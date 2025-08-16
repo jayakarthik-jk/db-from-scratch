@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Literal {
     Integer(i32),
     Float(f64),
@@ -20,6 +20,12 @@ impl Display for Literal {
                 Literal::String(value) => value.to_string(),
             }
         )
+    }
+}
+
+impl From<&str> for Literal {
+    fn from(value: &str) -> Self {
+        return Self::String(value.to_string());
     }
 }
 

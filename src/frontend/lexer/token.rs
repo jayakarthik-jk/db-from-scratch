@@ -1,6 +1,6 @@
 use super::{keyword::Keyword, literal::Literal, symbol::Symbol, Position};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) enum TokenKind {
     Keyword(Keyword),
     Symbol(Symbol),
@@ -8,7 +8,7 @@ pub(crate) enum TokenKind {
     Identifier(Identifier),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Token {
     pub(crate) kind: TokenKind,
     pub(crate) position: Position,

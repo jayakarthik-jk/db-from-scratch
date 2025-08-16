@@ -19,14 +19,28 @@ where
             return Some(Ok(Statement::Select {
                 select_expressions: expressions,
                 from: None,
+                predicate: None,
             }));
         }
 
-        let table_name = unwrap_ok!(match_token!(self.get_next_token(), TokenKind::Identifier(ident), ident));
+        let table_name = Some(unwrap_ok!(match_token!(self.get_next_token(), TokenKind::Identifier(ident), ident)));
+
+        let mut predicate = None;
+
+        match self.get_next_token()? {
+            Err(e) => return Some(Err(e)),
+            Ok(Token { kind: TokenKind::Keyword(Keyword::Where), .. }) => {
+                predicate = Some(unwrap_ok!(self.parse_expression()));
+            },
+            Ok(token) => {
+                self.tokens.rewind(token);
+            }
+        }
 
         return Some(Ok(Statement::Select {
             select_expressions: expressions,
-            from: Some(table_name),
+            from: table_name,
+            predicate,
         }));
     }
 }

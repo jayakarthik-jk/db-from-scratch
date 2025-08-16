@@ -2,14 +2,11 @@ pub(crate) mod backend;
 pub(crate) mod frontend;
 #[macro_use]
 pub(crate) mod util;
+#[cfg(test)]
+pub(crate) mod test;
 
 use std::io::{self, Write};
 
-use backend::{
-    cursor::Cursor,
-    row::Row,
-    table::{InsertError, Table},
-};
 use frontend::{
     lexer::{reader::CharacterIterator, Lexer},
     parser::Parser,
@@ -34,7 +31,6 @@ fn main() {
                 return;
             }
         }
-
         let reader = CharacterIterator::new(std::io::Cursor::new(command.clone()));
         let lexer = Lexer::new(BufferedLayer::new(reader));
         let parser = Parser::new(BufferedLayer::new(lexer));
@@ -68,99 +64,99 @@ fn main() {
     }
 }
 
-enum Statement {
-    Meta(String),
-    Insert(Row),
-}
-
-enum StatementPreparationError {
-    UnrecognizedCommand,
-    MissingField,
-    InvalidValue,
-}
-
-enum StatementProcessingError {
-    UnknownMetaCommand,
-    MaxRowReached,
-}
-
-struct App {
-    table: Table,
-}
-
-impl App {
-    fn new() -> Self {
-        let path = "test.db";
-        Self {
-            table: Table::new(path).unwrap(),
-        }
-    }
-}
-
-impl App {
-    fn prepare_statement(command: &str) -> Result<Statement, StatementPreparationError> {
-        if command.starts_with('.') {
-            return App::prepare_meta_statement(&command[1..]);
-        }
-
-        const INSERT: &'static str = "insert ";
-        if command.starts_with(INSERT) {
-            return App::prepare_insert_statement(&command[INSERT.len()..]);
-        }
-
-        return Err(StatementPreparationError::UnrecognizedCommand);
-    }
-
-    fn prepare_meta_statement(meta_command: &str) -> Result<Statement, StatementPreparationError> {
-        return Ok(Statement::Meta(meta_command.to_owned()));
-    }
-
-    fn prepare_insert_statement(data: &str) -> Result<Statement, StatementPreparationError> {
-        let splitted: Vec<&str> = data.splitn(3, ' ').collect();
-        let id = splitted
-            .get(0)
-            .ok_or(StatementPreparationError::MissingField)?
-            .parse::<u32>()
-            .map_err(|_| StatementPreparationError::InvalidValue)?;
-        let username = splitted
-            .get(1)
-            .ok_or(StatementPreparationError::MissingField)?
-            .to_string();
-        let email = splitted
-            .get(2)
-            .ok_or(StatementPreparationError::MissingField)?
-            .to_string();
-        return Ok(Statement::Insert(Row {
-            id,
-            username,
-            email,
-        }));
-    }
-
-    fn process_statement(
-        &mut self,
-        statement: Statement,
-    ) -> Result<bool, StatementProcessingError> {
-        match statement {
-            Statement::Meta(command) => match command.as_str() {
-                "exit" => {
-                    println!("Bye!");
-                    return Ok(true);
-                }
-                "show" => {
-                    let cursor = Cursor::from_start(&mut self.table);
-                    for row in cursor {
-                        println!("( {}, {}, {} )", row.id, row.username, row.email);
-                    }
-                }
-                _ => return Err(StatementProcessingError::UnknownMetaCommand),
-            },
-            Statement::Insert(row) => {
-                self.table.insert(row).map_err(|err| match err {
-                    InsertError::MaxRowReached => StatementProcessingError::MaxRowReached,
-                })?;
-            }
-        }
-        Ok(false)
-    }
-}
+// enum Statement {
+//     Meta(String),
+//     Insert(Row),
+// }
+//
+// enum StatementPreparationError {
+//     UnrecognizedCommand,
+//     MissingField,
+//     InvalidValue,
+// }
+//
+// enum StatementProcessingError {
+//     UnknownMetaCommand,
+//     MaxRowReached,
+// }
+//
+// struct App {
+//     table: Table,
+// }
+//
+// impl App {
+//     fn new() -> Self {
+//         let path = "test.db";
+//         Self {
+//             table: Table::new(path).unwrap(),
+//         }
+//     }
+// }
+//
+// impl App {
+//     fn prepare_statement(command: &str) -> Result<Statement, StatementPreparationError> {
+//         if command.starts_with('.') {
+//             return App::prepare_meta_statement(&command[1..]);
+//         }
+//
+//         const INSERT: &'static str = "insert ";
+//         if command.starts_with(INSERT) {
+//             return App::prepare_insert_statement(&command[INSERT.len()..]);
+//         }
+//
+//         return Err(StatementPreparationError::UnrecognizedCommand);
+//     }
+//
+//     fn prepare_meta_statement(meta_command: &str) -> Result<Statement, StatementPreparationError> {
+//         return Ok(Statement::Meta(meta_command.to_owned()));
+//     }
+//
+//     fn prepare_insert_statement(data: &str) -> Result<Statement, StatementPreparationError> {
+//         let splitted: Vec<&str> = data.splitn(3, ' ').collect();
+//         let id = splitted
+//             .get(0)
+//             .ok_or(StatementPreparationError::MissingField)?
+//             .parse::<u32>()
+//             .map_err(|_| StatementPreparationError::InvalidValue)?;
+//         let username = splitted
+//             .get(1)
+//             .ok_or(StatementPreparationError::MissingField)?
+//             .to_string();
+//         let email = splitted
+//             .get(2)
+//             .ok_or(StatementPreparationError::MissingField)?
+//             .to_string();
+//         return Ok(Statement::Insert(Row {
+//             id,
+//             username,
+//             email,
+//         }));
+//     }
+//
+//     fn process_statement(
+//         &mut self,
+//         statement: Statement,
+//     ) -> Result<bool, StatementProcessingError> {
+//         match statement {
+//             Statement::Meta(command) => match command.as_str() {
+//                 "exit" => {
+//                     println!("Bye!");
+//                     return Ok(true);
+//                 }
+//                 "show" => {
+//                     let cursor = Cursor::from_start(&mut self.table);
+//                     for row in cursor {
+//                         println!("( {}, {}, {} )", row.id, row.username, row.email);
+//                     }
+//                 }
+//                 _ => return Err(StatementProcessingError::UnknownMetaCommand),
+//             },
+//             Statement::Insert(row) => {
+//                 self.table.insert(row).map_err(|err| match err {
+//                     InsertError::MaxRowReached => StatementProcessingError::MaxRowReached,
+//                 })?;
+//             }
+//         }
+//         Ok(false)
+//     }
+// }
