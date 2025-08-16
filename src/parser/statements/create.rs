@@ -1,18 +1,17 @@
 use super::{Column, Statement};
 use crate::{
     common::layer::Layer,
+    error::DBError,
+    lexer::{keyword::Keyword, symbol::Symbol, token::TokenKind, Token},
+    parser::datatype::Datatype,
     Parser,
-    {
-        lexer::{keyword::Keyword, symbol::Symbol, token::TokenKind, LexerError, Token},
-        parser::{datatype::Datatype, error::ParserError},
-    },
 };
 
 impl<TokenLayer> Parser<TokenLayer>
 where
-    TokenLayer: Layer<Token, LexerError>,
+    TokenLayer: Layer<Token, DBError>,
 {
-    pub(crate) fn parse_create_statement(&mut self) -> Result<Statement, ParserError> {
+    pub(crate) fn parse_create_statement(&mut self) -> Result<Statement, DBError> {
         self.expect(TokenKind::Keyword(Keyword::Create))?;
 
         let table_name = self.expected_identifier()?;
@@ -31,19 +30,19 @@ where
         })
     }
 
-    pub(crate) fn parse_create_statement_column(&mut self) -> Result<Column, ParserError> {
+    pub(crate) fn parse_create_statement_column(&mut self) -> Result<Column, DBError> {
         let ident = self.expected_identifier()?;
 
         let data_type_token = self.get_next_token()?;
         let data_type = match data_type_token.kind {
             TokenKind::Keyword(keyword) => Datatype::from_keyword(keyword),
             _ => {
-                return Err(ParserError::KeywordExpected(data_type_token));
+                return Err(DBError::KeywordExpected(data_type_token));
             }
         };
 
         let Some(data_type) = data_type else {
-            return Err(ParserError::DatatypeExpected(data_type_token));
+            return Err(DBError::DatatypeExpected(data_type_token));
         };
         Ok(Column {
             name: ident,

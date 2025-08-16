@@ -1,10 +1,13 @@
 // pub(crate) mod backend;
+pub(crate) mod analyzer;
 pub(crate) mod common;
+pub(crate) mod error;
 pub(crate) mod lexer;
 pub(crate) mod parser;
 
 use std::io::{self, Write};
 
+use analyzer::Analyzer;
 use common::layer::BufferedLayer;
 use {
     lexer::{reader::CharacterIterator, Lexer},
@@ -31,10 +34,11 @@ fn main() {
         }
 
         let reader = CharacterIterator::new(std::io::Cursor::new(command));
-        let lexer = Lexer::new(BufferedLayer::new(reader));
+        let lexer = Lexer::new(reader);
         let parser = Parser::new(BufferedLayer::new(lexer));
-        parser.for_each(|statement| {
-            println!("{:?}", statement.expect("Unable to parse statement"));
+        let analyzer = Analyzer::new(BufferedLayer::new(parser));
+        analyzer.for_each(|statement| {
+            println!("{:?}", statement);
         });
 
         // let statement = match App::prepare_statement(&command[..command.len() - 2].trim()) {

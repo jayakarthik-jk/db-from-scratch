@@ -4,247 +4,119 @@ pub(crate) mod reader;
 pub(crate) mod symbol;
 pub(crate) mod token;
 
-use std::fmt::Display;
-
-use crate::common::layer::Layer;
+use crate::error::DBError;
 use keyword::Keyword;
 use literal::Literal;
 use reader::{Character, Position};
+use std::iter::Peekable;
 use symbol::Symbol;
 pub(crate) use token::Token;
 use token::{Span, TokenKind};
 
-pub(crate) struct Lexer<CharacterLayer>
+pub(crate) struct Lexer<Characters>
 where
-    CharacterLayer: Layer<Character, ()>,
+    Characters: Iterator<Item = Character>,
 {
-    characters: CharacterLayer,
+    characters: Peekable<Characters>,
 }
 
-impl<CharacterLayer> Lexer<CharacterLayer>
+impl<T> Iterator for Lexer<T>
 where
-    CharacterLayer: Layer<Character, ()>,
+    T: Iterator<Item = Character>,
 {
-    pub(crate) fn new(characters: CharacterLayer) -> Self {
-        Self { characters }
-    }
-
-    fn expect(&mut self, expected: char) -> bool {
-        if let Some(actual) = self.next_character() {
-            if expected == actual.value {
-                return true;
-            }
-            self.characters.rewind(actual);
-        }
-        false
-    }
-
-    fn next_character(&mut self) -> Option<Character> {
-        self.characters.next()?.ok()
-    }
-}
-
-impl<CharacterLayer> Iterator for Lexer<CharacterLayer>
-where
-    CharacterLayer: Layer<Character, ()>,
-{
-    type Item = Result<Token, LexerError>;
+    type Item = Result<Token, DBError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(ch) = self.next_character() {
             let token = match ch.value {
-                ' ' => {
+                ch if ch.is_whitespace() => {
                     continue;
                 }
-                '\n' => {
-                    continue;
-                }
-                '\r' => {
-                    let Some(ch) = self.next_character() else {
-                        continue;
-                    };
-                    if ch.value == '\n' {
-                        continue;
-                    }
-                    self.characters.rewind(ch);
-                    continue;
-                }
-
-                // TODO: handle multi line strings
-                '\"' => {
-                    let mut word = String::new();
-                    while let Some(next_ch) = self.next_character() {
-                        if next_ch.value == '\"' {
-                            return Some(Ok(Token::new(
-                                TokenKind::Literal(word.into()),
-                                Span {
-                                    start: ch.position,
-                                    end: next_ch.position,
-                                },
-                            )));
-                        } else if next_ch.value == '\n' || next_ch.value == '\r' {
-                            return Some(Err(LexerError::UnTerminatedStringLiteral(ch.position)));
-                        }
-                        word.push(next_ch.value);
-                    }
-                    return Some(Err(LexerError::UnTerminatedStringLiteral(ch.position)));
-                }
-                '\'' => {
-                    let mut word = String::new();
-                    while let Some(next_ch) = self.next_character() {
-                        if next_ch.value == '\'' {
-                            return Some(Ok(Token::new(
-                                TokenKind::Literal(word.into()),
-                                Span {
-                                    start: ch.position,
-                                    end: next_ch.position,
-                                },
-                            )));
-                        } else if next_ch.value == '\n' || next_ch.value == '\r' {
-                            return Some(Err(LexerError::UnTerminatedStringLiteral(ch.position)));
-                        }
-                        word.push(next_ch.value);
-                    }
-                    return Some(Err(LexerError::UnTerminatedStringLiteral(ch.position)));
-                }
-
                 // Symbols
                 '(' => Token::from_symbol(Symbol::OpenParanthesis, ch.position),
+
                 ')' => Token::from_symbol(Symbol::CloseParanthesis, ch.position),
+
                 '[' => Token::from_symbol(Symbol::OpenSquareBracket, ch.position),
+
                 ']' => Token::from_symbol(Symbol::CloseSquareBracket, ch.position),
+
                 '{' => Token::from_symbol(Symbol::OpenCurlyBracket, ch.position),
+
                 '}' => Token::from_symbol(Symbol::CloseCurlyBracket, ch.position),
+
                 ',' => Token::from_symbol(Symbol::Comma, ch.position),
+
                 ';' => Token::from_symbol(Symbol::Semicolon, ch.position),
 
-                '+' if self.expect('=') => Token::from_symbol(Symbol::PlusEquals, ch.position),
+                '+' if self.if_next('=') => Token::from_symbol(Symbol::PlusEquals, ch.position),
+
                 '+' => Token::from_symbol(Symbol::Plus, ch.position),
-                '-' if self.expect('=') => Token::from_symbol(Symbol::MinusEquals, ch.position),
+
+                '-' if self.if_next('=') => Token::from_symbol(Symbol::MinusEquals, ch.position),
+
                 '-' => Token::from_symbol(Symbol::Minus, ch.position),
-                '*' if self.expect('=') => Token::from_symbol(Symbol::StarEquals, ch.position),
+
+                '*' if self.if_next('=') => Token::from_symbol(Symbol::StarEquals, ch.position),
+
                 '*' => Token::from_symbol(Symbol::Star, ch.position),
-                '/' if self.expect('=') => Token::from_symbol(Symbol::DivideEquals, ch.position),
+
+                '/' if self.if_next('=') => Token::from_symbol(Symbol::DivideEquals, ch.position),
+
                 '/' => Token::from_symbol(Symbol::Divide, ch.position),
-                '%' if self.expect('=') => Token::from_symbol(Symbol::PercentEquals, ch.position),
+
+                '%' if self.if_next('=') => Token::from_symbol(Symbol::PercentEquals, ch.position),
+
                 '%' => Token::from_symbol(Symbol::Percent, ch.position),
-                '=' if self.expect('=') => Token::from_symbol(Symbol::Equals, ch.position),
+
+                '=' if self.if_next('=') => Token::from_symbol(Symbol::Equals, ch.position),
+
                 '=' => Token::from_symbol(Symbol::Equal, ch.position),
-                '!' if self.expect('=') => Token::from_symbol(Symbol::NotEquals, ch.position),
+
+                '!' if self.if_next('=') => Token::from_symbol(Symbol::NotEquals, ch.position),
+
                 '!' => Token::from_symbol(Symbol::Not, ch.position),
-                '<' if self.expect('=') => {
+
+                '<' if self.if_next('=') => {
                     Token::from_symbol(Symbol::LessThanOrEquals, ch.position)
                 }
                 '<' => Token::from_symbol(Symbol::LessThan, ch.position),
-                '>' if self.expect('=') => {
+
+                '>' if self.if_next('=') => {
                     Token::from_symbol(Symbol::GreaterThanOrEquals, ch.position)
                 }
                 '>' => Token::from_symbol(Symbol::GreaterThan, ch.position),
-                '&' if self.expect('&') => Token::from_symbol(Symbol::And, ch.position),
+
+                '&' if self.if_next('&') => Token::from_symbol(Symbol::And, ch.position),
+
                 '&' => Token::from_symbol(Symbol::BitAnd, ch.position),
-                '|' if self.expect('|') => Token::from_symbol(Symbol::Or, ch.position),
+
+                '|' if self.if_next('|') => Token::from_symbol(Symbol::Or, ch.position),
+
                 '|' => Token::from_symbol(Symbol::BitOr, ch.position),
+
                 '^' => Token::from_symbol(Symbol::BitXor, ch.position),
+
                 '~' => Token::from_symbol(Symbol::BitNot, ch.position),
+
+                '\"' | '\'' => return Some(self.collect_string_literal(ch)),
 
                 // skip comments
                 '#' => {
-                    while let Some(ch) = self.next_character() {
-                        if ch.value == '\n' {
-                            break;
-                        }
-                    }
+                    self.characters
+                        .by_ref()
+                        .skip_while(|ch| ch.value != '\n')
+                        .next();
                     continue;
-                }
-                // Identifiers and keywords
-                ch_val if ch_val.is_ascii_alphabetic() || ch_val == '_' => {
-                    let mut word = String::from(ch_val);
-                    let mut last_position = ch.position;
-                    while let Some(next_ch) = self.next_character() {
-                        if next_ch.value == ' ' {
-                            break;
-                        }
-                        if !next_ch.value.is_ascii_alphanumeric() && next_ch.value != '_' {
-                            self.characters.rewind(next_ch);
-                            break;
-                        }
-                        last_position = next_ch.position;
-                        word.push(next_ch.value);
-                    }
-                    if let Some(keyword) = Keyword::get_keyword_kind(&word) {
-                        Token::from_keyword(keyword, ch.position)
-                    } else if let Some(literal) = Literal::get_literal(&word) {
-                        Token::new(
-                            TokenKind::Literal(literal),
-                            Span {
-                                start: ch.position,
-                                end: last_position,
-                            },
-                        )
-                    } else {
-                        Token::new(
-                            TokenKind::Ident(word),
-                            Span {
-                                start: ch.position,
-                                end: last_position,
-                            },
-                        )
-                    }
                 }
 
                 // Numeric Literals
-                ch_val if ch_val.is_ascii_digit() => {
-                    let mut number_as_string = String::from(ch_val);
-                    let mut last_position = ch.position;
+                ch_val if ch_val.is_ascii_digit() => return Some(self.collect_numeric_literal(ch)),
+                // Identifiers and keywords
+                ch_val if Self::is_valid_ident(ch_val) => self.collect_ident(ch),
 
-                    // Collect the integer part of the number.
-                    while let Some(next_ch) = self.next_character() {
-                        if next_ch.value.is_ascii_digit() {
-                            number_as_string.push(next_ch.value);
-                        } else if next_ch.value == '.' {
-                            // Handle fractional part
-                            number_as_string.push('.');
-                            while let Some(fraction_ch) = self.next_character() {
-                                if !fraction_ch.value.is_ascii_digit() {
-                                    self.characters.rewind(fraction_ch);
-                                    break;
-                                }
-                                number_as_string.push(fraction_ch.value);
-                                last_position = fraction_ch.position;
-                            }
-
-                            // Parse as a floating-point number.
-                            return Some(match number_as_string.parse::<f64>() {
-                                Ok(number) => Ok(Token::new(
-                                    TokenKind::Literal(number.into()),
-                                    Span {
-                                        start: ch.position,
-                                        end: last_position,
-                                    },
-                                )),
-                                Err(_) => Err(LexerError::NumberExceededSize(ch.position)),
-                            });
-                        } else {
-                            self.characters.rewind(next_ch);
-                            break;
-                        }
-                        last_position = next_ch.position;
-                    }
-
-                    // Parse as an integer if no fractional part.
-                    match number_as_string.parse::<i32>() {
-                        Ok(number) => Token::new(
-                            TokenKind::Literal(number.into()),
-                            Span {
-                                start: ch.position,
-                                end: last_position,
-                            },
-                        ),
-                        Err(_) => return Some(Err(LexerError::NumberExceededSize(ch.position))),
-                    }
-                }
                 value => {
-                    return Some(Err(LexerError::IllegalCharacter(value, ch.position)));
+                    return Some(Err(DBError::IllegalCharacter(value, ch.position)));
                 }
             };
             return Some(Ok(token));
@@ -253,25 +125,136 @@ where
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum LexerError {
-    UnTerminatedStringLiteral(Position),
-    NumberExceededSize(Position),
-    IllegalCharacter(char, Position),
-}
+impl<T> Lexer<T>
+where
+    T: Iterator<Item = Character>,
+{
+    pub(crate) fn new(characters: T) -> Self {
+        Self {
+            characters: characters.peekable(),
+        }
+    }
 
-impl Display for LexerError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            LexerError::UnTerminatedStringLiteral(pos) => {
-                write!(f, "Unterminated string literal at position: {:?}", pos)
+    fn if_next(&mut self, expected: char) -> bool {
+        self.characters.next_if(|ch| ch.value == expected).is_some()
+    }
+
+    fn next_character(&mut self) -> Option<Character> {
+        self.characters.next()
+    }
+
+    fn collect_rest_of_number(&mut self, initial_char: Character) -> (String, Position) {
+        let mut number_as_string = String::from(initial_char.value);
+        let mut last_position = initial_char.position;
+
+        while let Some(next_ch) = self
+            .characters
+            .next_if(|next_ch| next_ch.value.is_ascii_digit())
+        {
+            number_as_string.push(next_ch.value);
+            last_position = next_ch.position;
+        }
+
+        (number_as_string, last_position)
+    }
+
+    pub(crate) fn collect_string_literal(
+        &mut self,
+        enclosing: Character,
+    ) -> Result<Token, DBError> {
+        let mut word = String::new();
+        println!("Collecting string literal starting with: {}", enclosing.value);
+        while let Some(next_ch) = self
+            .characters
+            .next_if(|next_ch| next_ch.value != enclosing.value && next_ch.value != '\n')
+        {
+            println!("Collecting string literal: {}", next_ch.value);
+            word.push(next_ch.value);
+        }
+        if let Some(last) = self.characters.next_if(|ch| ch.value == enclosing.value) {
+            return Ok(Token::new(
+                TokenKind::Literal(word.into()),
+                Span {
+                    start: enclosing.position,
+                    end: last.position,
+                },
+            ));
+        }
+        // If we reach here, it means we didn't find a closing quote.
+        return Err(DBError::UnTerminatedStringLiteral(enclosing.position));
+    }
+
+    pub(crate) fn collect_numeric_literal(
+        &mut self,
+        initial_char: Character,
+    ) -> Result<Token, DBError> {
+        let (number_as_string, last_position) = self.collect_rest_of_number(initial_char);
+
+        if let Some(next_ch) = self.characters.next_if(|ch| ch.value == '.') {
+            // Collect the fractional part of the number.
+            let (fraction_ch, last_position) = self.collect_rest_of_number(next_ch);
+            let full_number = format!("{}.{}", number_as_string, fraction_ch);
+
+            // Parse as a floating-point number.
+            match full_number.parse::<f64>() {
+                Ok(number) => Ok(Token::new(
+                    TokenKind::Literal(number.into()),
+                    Span {
+                        start: initial_char.position,
+                        end: last_position,
+                    },
+                )),
+                Err(_) => Err(DBError::NumberExceededSize(initial_char.position)),
             }
-            LexerError::NumberExceededSize(pos) => {
-                write!(f, "Number exceeded size limit at position: {:?}", pos)
-            }
-            LexerError::IllegalCharacter(ch, pos) => {
-                write!(f, "Illegal character '{}' at position: {:?}", ch, pos)
+        } else {
+            // Parse as an integer if no fractional part.
+            match number_as_string.parse::<i32>() {
+                Ok(number) => Ok(Token::new(
+                    TokenKind::Literal(number.into()),
+                    Span {
+                        start: initial_char.position,
+                        end: last_position,
+                    },
+                )),
+                Err(_) => Err(DBError::NumberExceededSize(initial_char.position)),
             }
         }
+    }
+
+    pub(crate) fn collect_ident(&mut self, ch: Character) -> Token {
+        let mut word = String::from(ch.value);
+        let mut last_position = ch.position;
+
+        while let Some(next_ch) = self
+            .characters
+            .next_if(|next_ch| Self::is_valid_ident(next_ch.value))
+        {
+            word.push(next_ch.value);
+            last_position = next_ch.position;
+        }
+
+        if let Some(keyword) = Keyword::get_keyword_kind(&word) {
+            Token::from_keyword(keyword, ch.position)
+        } else if let Some(literal) = Literal::get_literal(&word) {
+            Token::new(
+                TokenKind::Literal(literal),
+                Span {
+                    start: ch.position,
+                    end: last_position,
+                },
+            )
+        } else {
+            Token::new(
+                TokenKind::Ident(word),
+                Span {
+                    start: ch.position,
+                    end: last_position,
+                },
+            )
+        }
+    }
+
+    fn is_valid_ident(ch: char) -> bool {
+        ch.is_ascii_alphabetic() || ch == '_' || ch.is_ascii_digit()
     }
 }

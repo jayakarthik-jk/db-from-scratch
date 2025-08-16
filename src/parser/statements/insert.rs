@@ -1,18 +1,16 @@
 use super::Statement;
 use crate::{
     common::layer::Layer,
+    error::DBError,
+    lexer::{keyword::Keyword, symbol::Symbol, token::TokenKind, Token},
     Parser,
-    {
-        lexer::{keyword::Keyword, symbol::Symbol, token::TokenKind, LexerError, Token},
-        parser::error::ParserError,
-    },
 };
 
 impl<TokenLayer> Parser<TokenLayer>
 where
-    TokenLayer: Layer<Token, LexerError>,
+    TokenLayer: Layer<Token, DBError>,
 {
-    pub(crate) fn parse_insert_statement(&mut self) -> Result<Statement, ParserError> {
+    pub(crate) fn parse_insert_statement(&mut self) -> Result<Statement, DBError> {
         self.expect(TokenKind::Keyword(Keyword::Into))?;
 
         let table_name = self.expected_identifier()?;

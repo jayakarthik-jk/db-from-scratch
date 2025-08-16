@@ -2,11 +2,9 @@ use std::fmt::Display;
 
 use crate::{
     common::layer::Layer,
+    error::DBError,
+    lexer::{keyword::Keyword, symbol::Symbol, token::TokenKind, Token},
     Parser,
-    {
-        lexer::{keyword::Keyword, symbol::Symbol, token::TokenKind, LexerError, Token},
-        parser::error::ParserError,
-    },
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -68,9 +66,9 @@ impl BinaryOperator {
     pub(crate) fn parse_binary_operator<TokenLayer>(
         parser: &mut Parser<TokenLayer>,
         precedence: u8,
-    ) -> Option<Result<Self, ParserError>>
+    ) -> Option<Result<Self, DBError>>
     where
-        TokenLayer: Layer<Token, LexerError>,
+        TokenLayer: Layer<Token, DBError>,
     {
         let token = parser.get_next_token();
         let token = match token {

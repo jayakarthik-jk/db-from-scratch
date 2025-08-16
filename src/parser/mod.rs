@@ -1,5 +1,4 @@
 pub(crate) mod datatype;
-pub(crate) mod error;
 pub(crate) mod expression;
 pub(crate) mod operators;
 pub(crate) mod statements;
@@ -8,31 +7,30 @@ use super::lexer::{
     keyword::Keyword,
     symbol::Symbol,
     token::{Ident, TokenKind},
-    LexerError, Token,
+    Token,
 };
-use crate::common::layer::Layer;
-use error::ParserError;
+use crate::{common::layer::Layer, error::DBError};
 use expression::Expression;
 use operators::binary::BinaryOperator;
 use statements::Statement;
 
 pub(crate) struct Parser<TokenLayer>
 where
-    TokenLayer: Layer<Token, LexerError>,
+    TokenLayer: Layer<Token, DBError>,
 {
     tokens: TokenLayer,
 }
 
 impl<TokenLayer> Iterator for Parser<TokenLayer>
 where
-    TokenLayer: Layer<Token, LexerError>,
+    TokenLayer: Layer<Token, DBError>,
 {
-    type Item = Result<Statement, ParserError>;
+    type Item = Result<Statement, DBError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let keyword = match self.expect_keyword_kind() {
             Ok(keyword) => keyword,
-            Err(ParserError::Eof) => return None,
+            Err(DBError::Eof) => return None,
             Err(err) => return Some(Err(err)),
         };
 
@@ -44,11 +42,11 @@ where
             Keyword::Select => self.parse_select_statement(),
             Keyword::Update => self.parse_update_statement(),
             Keyword::Delete => self.parse_delete_statement(),
-            _ => return Some(Err(ParserError::UnexpectedStatement)),
+            _ => return Some(Err(DBError::UnexpectedStatement)),
         };
 
         match &statement {
-            Err(ParserError::Eof) => None,
+            Err(DBError::Eof) => None,
 
             // traverse the tokens until the next Semicolon
             Err(_) => {
@@ -62,7 +60,7 @@ where
 
             Ok(_) => Some(match self.expect(TokenKind::Symbol(Symbol::Semicolon)) {
                 Ok(_) => statement,
-                Err(ParserError::Eof) => Err(ParserError::UnexpectedToken {
+                Err(DBError::Eof) => Err(DBError::UnexpectedToken {
                     expected: TokenKind::Symbol(Symbol::Semicolon),
                 }),
                 Err(err) => Err(err),
@@ -73,50 +71,49 @@ where
 
 impl<TokenLayer> Parser<TokenLayer>
 where
-    TokenLayer: Layer<Token, LexerError>,
+    TokenLayer: Layer<Token, DBError>,
 {
     pub(crate) fn new(tokens: TokenLayer) -> Self {
         Self { tokens }
     }
 
-    fn get_next_token(&mut self) -> Result<Token, ParserError> {
+    fn get_next_token(&mut self) -> Result<Token, DBError> {
         self.tokens
             .next()
-            .ok_or(ParserError::Eof)?
-            .map_err(ParserError::LexerError)
+            .ok_or(DBError::Eof)?
     }
 
-    fn expect(&mut self, expected: TokenKind) -> Result<(), ParserError> {
+    fn expect(&mut self, expected: TokenKind) -> Result<(), DBError> {
         match self.get_next_token()? {
             Token { kind: actual, .. } if expected == actual => Ok(()),
-            token => Err(ParserError::Unexpected {
+            token => Err(DBError::Unexpected {
                 found: token,
                 expected,
             }),
         }
     }
 
-    fn expect_keyword_kind(&mut self) -> Result<Keyword, ParserError> {
+    fn expect_keyword_kind(&mut self) -> Result<Keyword, DBError> {
         match self.get_next_token()? {
             Token {
                 kind: TokenKind::Keyword(keyword),
                 ..
             } => Ok(keyword),
-            token => Err(ParserError::KeywordExpected(token)),
+            token => Err(DBError::KeywordExpected(token)),
         }
     }
 
-    fn expected_identifier(&mut self) -> Result<Ident, ParserError> {
+    fn expected_identifier(&mut self) -> Result<Ident, DBError> {
         match self.get_next_token()? {
             Token {
                 kind: TokenKind::Ident(ident),
                 ..
             } => Ok(ident),
-            token => Err(ParserError::IdentExpected(token)),
+            token => Err(DBError::IdentExpected(token)),
         }
     }
 
-    fn parse_predicate(&mut self) -> Result<Option<Expression>, ParserError> {
+    fn parse_predicate(&mut self) -> Result<Option<Expression>, DBError> {
         let mut predicate = None;
         match self.get_next_token()? {
             Token {
@@ -132,11 +129,11 @@ where
         Ok(predicate)
     }
 
-    fn parse_expression(&mut self) -> Result<Expression, ParserError> {
+    fn parse_expression(&mut self) -> Result<Expression, DBError> {
         self.parse_expression_of(BinaryOperator::max_precedence())
     }
 
-    fn parse_expression_of(&mut self, precedence: u8) -> Result<Expression, ParserError> {
+    fn parse_expression_of(&mut self, precedence: u8) -> Result<Expression, DBError> {
         if precedence == 0 {
             return self.parse_factor();
         }
@@ -171,17 +168,17 @@ where
         Ok(left)
     }
 
-    fn expect_ident(&mut self) -> Result<Ident, ParserError> {
+    fn expect_ident(&mut self) -> Result<Ident, DBError> {
         match self.get_next_token()? {
             Token {
                 kind: TokenKind::Ident(ident),
                 ..
             } => Ok(ident),
-            token => Err(ParserError::IdentExpected(token)),
+            token => Err(DBError::IdentExpected(token)),
         }
     }
 
-    fn parse_factor(&mut self) -> Result<Expression, ParserError> {
+    fn parse_factor(&mut self) -> Result<Expression, DBError> {
         let token = self.get_next_token()?;
         match token.kind {
             TokenKind::Literal(literal) => Ok(Expression::Literal(literal)),
@@ -208,7 +205,7 @@ where
             }
             _ => {
                 self.tokens.rewind(token);
-                Err(ParserError::NotAnExpression)
+                Err(DBError::NotAnExpression)
             }
         }
     }
@@ -216,7 +213,7 @@ where
     fn parse_separated_expressions(
         &mut self,
         separator: Symbol,
-    ) -> Result<Vec<Expression>, ParserError> {
+    ) -> Result<Vec<Expression>, DBError> {
         self.parse_seperated(separator, |parser| parser.parse_expression())
     }
 
@@ -224,9 +221,9 @@ where
         &mut self,
         separator: Symbol,
         callback: Callback,
-    ) -> Result<Vec<ReturnType>, ParserError>
+    ) -> Result<Vec<ReturnType>, DBError>
     where
-        Callback: Fn(&mut Self) -> Result<ReturnType, ParserError>,
+        Callback: Fn(&mut Self) -> Result<ReturnType, DBError>,
     {
         let mut expressions = Vec::new();
 

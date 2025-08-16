@@ -1,16 +1,14 @@
 use super::{Column, Statement};
 use crate::{
     common::layer::Layer,
-    Parser,
-    {
-        lexer::{
-            keyword::Keyword,
-            symbol::Symbol,
-            token::{Ident, TokenKind},
-            LexerError, Token,
-        },
-        parser::error::{IntoParseResult, ParserError},
+    error::{DBError, IntoParseResult},
+    lexer::{
+        keyword::Keyword,
+        symbol::Symbol,
+        token::{Ident, TokenKind},
+        Token,
     },
+    Parser,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -23,9 +21,9 @@ pub(crate) enum AlterType {
 
 impl<TokenLayer> Parser<TokenLayer>
 where
-    TokenLayer: Layer<Token, LexerError>,
+    TokenLayer: Layer<Token, DBError>,
 {
-    pub(crate) fn parse_alter_statement(&mut self) -> Result<Statement, ParserError> {
+    pub(crate) fn parse_alter_statement(&mut self) -> Result<Statement, DBError> {
         self.expect(TokenKind::Keyword(Keyword::Table))?;
 
         let table_name = self.expected_identifier()?;
@@ -39,7 +37,7 @@ where
         })
     }
 
-    pub(crate) fn parse_alter_type(&mut self) -> Result<AlterType, ParserError> {
+    pub(crate) fn parse_alter_type(&mut self) -> Result<AlterType, DBError> {
         let Token {
             kind: TokenKind::Keyword(keyword),
             ..
@@ -92,7 +90,7 @@ where
             }
 
             keyword => {
-                return Err(ParserError::UnExpectedAlterType {
+                return Err(DBError::UnExpectedAlterType {
                     expected: Keyword::Add,
                     found: TokenKind::Keyword(keyword),
                 })

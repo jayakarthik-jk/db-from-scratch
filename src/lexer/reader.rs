@@ -3,7 +3,7 @@ use std::{
     ops::Add,
 };
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) struct Character {
     pub(crate) value: char,
     pub(crate) position: Position,
@@ -68,7 +68,7 @@ impl<T: Read> CharacterIterator<T> {
 }
 
 impl<T: Read> Iterator for CharacterIterator<T> {
-    type Item = Result<Character, ()>;
+    type Item = Character;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.cursor >= self.buffer.len() && !self.refill_buffer() {
@@ -93,10 +93,10 @@ impl<T: Read> Iterator for CharacterIterator<T> {
                     }
                 }
 
-                Some(Ok(Character {
+                Some(Character {
                     value: ch,
                     position: self.position,
-                }))
+                })
             }
             Err(e) => {
                 let valid_up_to = e.valid_up_to();
@@ -124,10 +124,10 @@ impl<T: Read> Iterator for CharacterIterator<T> {
                     }
                 }
 
-                Some(Ok(Character {
+                Some(Character {
                     value: ch,
                     position: self.position,
-                }))
+                })
             }
         }
     }

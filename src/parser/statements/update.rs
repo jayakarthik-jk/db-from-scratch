@@ -1,15 +1,14 @@
 use crate::{
     common::layer::Layer,
-    Parser,
-    {
-        lexer::{
-            keyword::Keyword,
-            symbol::Symbol,
-            token::{Ident, TokenKind},
-            LexerError, Token,
-        },
-        parser::{error::ParserError, expression::Expression},
+    error::DBError,
+    lexer::{
+        keyword::Keyword,
+        symbol::Symbol,
+        token::{Ident, TokenKind},
+        Token,
     },
+    parser::expression::Expression,
+    Parser,
 };
 
 use super::Statement;
@@ -22,9 +21,9 @@ pub(crate) struct UpdateSet {
 
 impl<TokenLayer> Parser<TokenLayer>
 where
-    TokenLayer: Layer<Token, LexerError>,
+    TokenLayer: Layer<Token, DBError>,
 {
-    pub(crate) fn parse_update_statement(&mut self) -> Result<Statement, ParserError> {
+    pub(crate) fn parse_update_statement(&mut self) -> Result<Statement, DBError> {
         let table_name = self.expect_ident()?;
 
         self.expect(TokenKind::Keyword(Keyword::Set))?;
@@ -40,7 +39,7 @@ where
         })
     }
 
-    pub(crate) fn parse_update_set(&mut self) -> Result<UpdateSet, ParserError> {
+    pub(crate) fn parse_update_set(&mut self) -> Result<UpdateSet, DBError> {
         let column = self.expect_ident()?;
 
         self.expect(TokenKind::Symbol(Symbol::Equal))?;
