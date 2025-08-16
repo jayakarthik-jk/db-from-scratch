@@ -1,15 +1,14 @@
 use super::{Column, Statement};
 use crate::{
-    common::layer::Layer,
     error::DBError,
     lexer::{keyword::Keyword, symbol::Symbol, token::TokenKind, Token},
     parser::datatype::Datatype,
     Parser,
 };
 
-impl<TokenLayer> Parser<TokenLayer>
+impl<Tokens> Parser<Tokens>
 where
-    TokenLayer: Layer<Token, DBError>,
+    Tokens: Iterator<Item = Result<Token, DBError>>,
 {
     pub(crate) fn parse_create_statement(&mut self) -> Result<Statement, DBError> {
         self.expect(TokenKind::Keyword(Keyword::Create))?;

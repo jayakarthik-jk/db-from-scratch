@@ -5,7 +5,7 @@ use std::fmt::Display;
 #[derive(Debug, PartialEq)]
 pub(crate) enum Expression {
     Literal(Literal),
-    Identifier(Ident),
+    Ident(Ident),
     FunctionCall {
         ident: Ident,
         arguments: Vec<Expression>,
@@ -22,7 +22,7 @@ impl Display for Expression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Expression::Literal(literal) => write!(f, "{}", literal),
-            Expression::Identifier(ident) => write!(f, "{}", ident),
+            Expression::Ident(ident) => write!(f, "{}", ident),
             Expression::FunctionCall { ident, arguments } => {
                 write!(f, "{}(", ident)?;
                 for (i, arg) in arguments.iter().enumerate() {

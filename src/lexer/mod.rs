@@ -104,9 +104,7 @@ where
                 // skip comments
                 '#' => {
                     self.characters
-                        .by_ref()
-                        .skip_while(|ch| ch.value != '\n')
-                        .next();
+                        .find(|ch| ch.value != '\n');
                     continue;
                 }
 
@@ -181,7 +179,7 @@ where
             ));
         }
         // If we reach here, it means we didn't find a closing quote.
-        return Err(DBError::UnTerminatedStringLiteral(enclosing.position));
+        Err(DBError::UnTerminatedStringLiteral(enclosing.position))
     }
 
     pub(crate) fn collect_numeric_literal(

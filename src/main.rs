@@ -8,7 +8,6 @@ pub(crate) mod parser;
 use std::io::{self, Write};
 
 use analyzer::Analyzer;
-use common::layer::BufferedLayer;
 use {
     lexer::{reader::CharacterIterator, Lexer},
     parser::Parser,
@@ -35,8 +34,9 @@ fn main() {
 
         let reader = CharacterIterator::new(std::io::Cursor::new(command));
         let lexer = Lexer::new(reader);
-        let parser = Parser::new(BufferedLayer::new(lexer));
-        let analyzer = Analyzer::new(BufferedLayer::new(parser));
+        let parser = Parser::new(lexer);
+        let analyzer = Analyzer::new(parser);
+
         analyzer.for_each(|statement| {
             println!("{:?}", statement);
         });

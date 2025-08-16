@@ -1,5 +1,4 @@
 use crate::{
-    common::layer::Layer,
     error::DBError,
     lexer::{
         keyword::Keyword,
@@ -19,9 +18,9 @@ pub(crate) struct UpdateSet {
     pub(crate) value: Expression,
 }
 
-impl<TokenLayer> Parser<TokenLayer>
+impl<Tokens> Parser<Tokens>
 where
-    TokenLayer: Layer<Token, DBError>,
+    Tokens: Iterator<Item = Result<Token, DBError>>,
 {
     pub(crate) fn parse_update_statement(&mut self) -> Result<Statement, DBError> {
         let table_name = self.expect_ident()?;

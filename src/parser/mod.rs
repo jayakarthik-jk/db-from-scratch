@@ -3,27 +3,29 @@ pub(crate) mod expression;
 pub(crate) mod operators;
 pub(crate) mod statements;
 
+use std::iter::Peekable;
+
 use super::lexer::{
     keyword::Keyword,
     symbol::Symbol,
     token::{Ident, TokenKind},
     Token,
 };
-use crate::{common::layer::Layer, error::DBError};
+use crate::error::DBError;
 use expression::Expression;
 use operators::binary::BinaryOperator;
 use statements::Statement;
 
-pub(crate) struct Parser<TokenLayer>
+pub(crate) struct Parser<Tokens>
 where
-    TokenLayer: Layer<Token, DBError>,
+    Tokens: Iterator<Item = Result<Token, DBError>>,
 {
-    tokens: TokenLayer,
+    tokens: Peekable<Tokens>,
 }
 
-impl<TokenLayer> Iterator for Parser<TokenLayer>
+impl<Tokens> Iterator for Parser<Tokens>
 where
-    TokenLayer: Layer<Token, DBError>,
+    Tokens: Iterator<Item = Result<Token, DBError>>,
 {
     type Item = Result<Statement, DBError>;
 
@@ -60,7 +62,7 @@ where
 
             Ok(_) => Some(match self.expect(TokenKind::Symbol(Symbol::Semicolon)) {
                 Ok(_) => statement,
-                Err(DBError::Eof) => Err(DBError::UnexpectedToken {
+                Err(DBError::Eof) => Err(DBError::UnexpectedEof {
                     expected: TokenKind::Symbol(Symbol::Semicolon),
                 }),
                 Err(err) => Err(err),
@@ -69,18 +71,18 @@ where
     }
 }
 
-impl<TokenLayer> Parser<TokenLayer>
+impl<Tokens> Parser<Tokens>
 where
-    TokenLayer: Layer<Token, DBError>,
+    Tokens: Iterator<Item = Result<Token, DBError>>,
 {
-    pub(crate) fn new(tokens: TokenLayer) -> Self {
-        Self { tokens }
+    pub(crate) fn new(tokens: Tokens) -> Self {
+        Self {
+            tokens: tokens.peekable(),
+        }
     }
 
     fn get_next_token(&mut self) -> Result<Token, DBError> {
-        self.tokens
-            .next()
-            .ok_or(DBError::Eof)?
+        self.tokens.next().ok_or(DBError::Eof)?
     }
 
     fn expect(&mut self, expected: TokenKind) -> Result<(), DBError> {
@@ -91,6 +93,11 @@ where
                 expected,
             }),
         }
+    }
+
+    fn next_if(&mut self, expected: TokenKind) -> Option<Result<Token, DBError>> {
+        self.tokens
+            .next_if(|token| matches!(token, Ok(Token { kind, .. }) if *kind == expected))
     }
 
     fn expect_keyword_kind(&mut self) -> Result<Keyword, DBError> {
@@ -114,19 +121,11 @@ where
     }
 
     fn parse_predicate(&mut self) -> Result<Option<Expression>, DBError> {
-        let mut predicate = None;
-        match self.get_next_token()? {
-            Token {
-                kind: TokenKind::Keyword(Keyword::Where),
-                ..
-            } => {
-                predicate = Some(self.parse_expression()?);
-            }
-            token => {
-                self.tokens.rewind(token);
-            }
+        if self.next_if(TokenKind::Keyword(Keyword::Where)).is_some() {
+            Ok(Some(self.parse_expression()?))
+        } else {
+            Ok(None)
         }
-        Ok(predicate)
     }
 
     fn parse_expression(&mut self) -> Result<Expression, DBError> {
@@ -139,12 +138,9 @@ where
         }
 
         // Handle NOT operator
-        let token = self.get_next_token()?;
-        if let TokenKind::Keyword(Keyword::Not) = token.kind {
+        if self.next_if(TokenKind::Keyword(Keyword::Not)).is_some() {
             let next_expression = self.parse_expression_of(precedence - 1)?;
             return Ok(Expression::Negation(Box::new(next_expression)));
-        } else {
-            self.tokens.rewind(token);
         }
 
         let mut left = self.parse_expression_of(precedence - 1)?;
@@ -183,9 +179,10 @@ where
         match token.kind {
             TokenKind::Literal(literal) => Ok(Expression::Literal(literal)),
             TokenKind::Ident(ident) => {
-                let next_token = self.get_next_token()?;
-                if let TokenKind::Symbol(Symbol::OpenParanthesis) = next_token.kind {
-                    // Function call
+                if self
+                    .next_if(TokenKind::Symbol(Symbol::OpenParanthesis))
+                    .is_some()
+                {
                     let expressions = self.parse_separated_expressions(Symbol::Comma)?;
                     self.expect(TokenKind::Symbol(Symbol::CloseParanthesis))?;
                     Ok(Expression::FunctionCall {
@@ -193,9 +190,7 @@ where
                         arguments: expressions,
                     })
                 } else {
-                    // Just an identifier
-                    self.tokens.rewind(next_token);
-                    Ok(Expression::Identifier(ident))
+                    Ok(Expression::Ident(ident))
                 }
             }
             TokenKind::Symbol(Symbol::OpenParanthesis) => {
@@ -203,10 +198,7 @@ where
                 self.expect(TokenKind::Symbol(Symbol::CloseParanthesis))?;
                 Ok(expression)
             }
-            _ => {
-                self.tokens.rewind(token);
-                Err(DBError::NotAnExpression)
-            }
+            _ => Err(DBError::UnexpectedToken { found: token }),
         }
     }
 
@@ -231,15 +223,9 @@ where
             let expr = callback(self)?;
             expressions.push(expr);
             // Ensure separator before each expression
-            let token = self.get_next_token()?;
-
-            if let TokenKind::Symbol(symbol) = token.kind {
-                if symbol == separator {
-                    continue;
-                }
+            if self.next_if(TokenKind::Symbol(separator)).is_none() {
+                break;
             }
-            self.tokens.rewind(token);
-            break;
         }
 
         Ok(expressions)

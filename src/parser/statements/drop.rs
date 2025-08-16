@@ -1,14 +1,13 @@
 use super::Statement;
 use crate::{
-    common::layer::Layer,
     error::DBError,
     lexer::{keyword::Keyword, token::TokenKind, Token},
     Parser,
 };
 
-impl<TokenLayer> Parser<TokenLayer>
+impl<Tokens> Parser<Tokens>
 where
-    TokenLayer: Layer<Token, DBError>,
+    Tokens: Iterator<Item = Result<Token, DBError>>,
 {
     pub(crate) fn parse_drop_statement(&mut self) -> Result<Statement, DBError> {
         self.expect(TokenKind::Keyword(Keyword::Table))?;

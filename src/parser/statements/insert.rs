@@ -1,14 +1,13 @@
 use super::Statement;
 use crate::{
-    common::layer::Layer,
     error::DBError,
     lexer::{keyword::Keyword, symbol::Symbol, token::TokenKind, Token},
     Parser,
 };
 
-impl<TokenLayer> Parser<TokenLayer>
+impl<Tokens> Parser<Tokens>
 where
-    TokenLayer: Layer<Token, DBError>,
+    Tokens: Iterator<Item = Result<Token, DBError>>,
 {
     pub(crate) fn parse_insert_statement(&mut self) -> Result<Statement, DBError> {
         self.expect(TokenKind::Keyword(Keyword::Into))?;
@@ -17,15 +16,11 @@ where
 
         let mut columns = None;
 
-        let token = self.get_next_token()?;
-
-        if let TokenKind::Symbol(Symbol::OpenParanthesis) = token.kind {
+        if self.next_if(TokenKind::Symbol(Symbol::OpenParanthesis)).is_some() {
             let column_names =
                 self.parse_seperated(Symbol::Comma, |parser| parser.expect_ident())?;
             self.expect(TokenKind::Symbol(Symbol::CloseParanthesis))?;
             columns = Some(column_names);
-        } else {
-            self.tokens.rewind(token);
         }
 
         self.expect(TokenKind::Keyword(Keyword::Values))?;

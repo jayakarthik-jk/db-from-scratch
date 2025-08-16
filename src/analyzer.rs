@@ -1,20 +1,20 @@
 use std::fmt::Display;
 
-use crate::{common::layer::Layer, error::DBError, parser::statements::Statement};
+use crate::{error::DBError, parser::statements::Statement};
 
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct Analyzer<ParserLayer>
+pub(crate) struct Analyzer<Statements>
 where
-    ParserLayer: Layer<Statement, DBError>,
+    Statements: Iterator<Item = Result<Statement, DBError>>,
 {
-    statements: ParserLayer,
+    statements: Statements,
 }
 
-impl<ParserLayer> Analyzer<ParserLayer>
+impl<Statements> Analyzer<Statements>
 where
-    ParserLayer: Layer<Statement, DBError>,
+    Statements: Iterator<Item = Result<Statement, DBError>>,
 {
-    pub(crate) fn new(statements: ParserLayer) -> Self {
+    pub(crate) fn new(statements: Statements) -> Self {
         Self { statements }
     }
 
@@ -23,9 +23,9 @@ where
     }
 }
 
-impl<ParserLayer> Iterator for Analyzer<ParserLayer>
+impl<Statements> Iterator for Analyzer<Statements>
 where
-    ParserLayer: Layer<Statement, DBError>,
+    Statements: Iterator<Item = Result<Statement, DBError>>,
 {
     type Item = Result<Statement, AnalyzerError>;
 

@@ -1,10 +1,7 @@
 use std::fmt::Display;
 
 use crate::{
-    common::layer::Layer,
-    error::DBError,
-    lexer::{keyword::Keyword, symbol::Symbol, token::TokenKind, Token},
-    Parser,
+    error::DBError, lexer::{keyword::Keyword, symbol::Symbol, token::TokenKind, Token}, Parser
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -38,7 +35,7 @@ pub(crate) enum BinaryOperator {
 
 impl BinaryOperator {
     pub(crate) const fn match_symbol_with_precedence(
-        symbol: Symbol,
+        symbol: &Symbol,
         precedence: u8,
     ) -> Option<Self> {
         let operator = match symbol {
@@ -63,35 +60,30 @@ impl BinaryOperator {
         None
     }
 
-    pub(crate) fn parse_binary_operator<TokenLayer>(
-        parser: &mut Parser<TokenLayer>,
+    pub(crate) fn parse_binary_operator<Tokens>(
+        parser: &mut Parser<Tokens>,
         precedence: u8,
     ) -> Option<Result<Self, DBError>>
     where
-        TokenLayer: Layer<Token, DBError>,
+        Tokens: Iterator<Item = Result<Token, DBError>>,
     {
-        let token = parser.get_next_token();
-        let token = match token {
+        let token = match parser.tokens.peek()? {
             Ok(token) => token,
-            Err(err) => return Some(Err(err)),
+            Err(err) => return Some(Err(err.to_owned())),
         };
-        match token {
+        let operator = match token {
             Token {
                 kind: TokenKind::Symbol(symbol),
                 ..
             } => {
-                if let Some(operator) = Self::match_symbol_with_precedence(symbol, precedence) {
-                    Some(Ok(operator))
-                } else {
-                    parser.tokens.rewind(token);
-                    None
-                }
+                Self::match_symbol_with_precedence(symbol, precedence)?
             }
             Token {
                 kind: TokenKind::Keyword(keyword),
                 ..
             } => {
-                let operator = match keyword {
+                
+                match keyword {
                     Keyword::And if BinaryOperator::And.precedence() == precedence => {
                         BinaryOperator::And
                     }
@@ -104,19 +96,15 @@ impl BinaryOperator {
                     Keyword::Like if BinaryOperator::Like.precedence() == precedence => {
                         BinaryOperator::Like
                     }
-                    _ => {
-                        parser.tokens.rewind(token);
-                        return None;
-                    }
-                };
-                Some(Ok(operator))
+                    _ => return None
+                }
             }
 
-            token => {
-                parser.tokens.rewind(token);
-                None
-            }
-        }
+            _ => return None
+        };
+
+        assert!(parser.tokens.next().is_some());
+        Some(Ok(operator))
     }
 
     pub(crate) const fn max_precedence() -> u8 {

@@ -10,9 +10,9 @@ pub(crate) enum DBError {
     IllegalCharacter(char, Position),
 
     // Parser errors
-    NotAnExpression,
     Unexpected { found: Token, expected: TokenKind },
-    UnexpectedToken { expected: TokenKind },
+    UnexpectedEof { expected: TokenKind },
+    UnexpectedToken { found: Token },
     IdentExpected(Token),
     KeywordExpected(Token),
     DatatypeExpected(Token),
@@ -36,7 +36,6 @@ impl Display for DBError {
             }
 
 
-            DBError::NotAnExpression => write!(f, "Not an expression"),
             DBError::Unexpected { found, expected } => {
                 write!(
                     f,
@@ -44,8 +43,11 @@ impl Display for DBError {
                     found, expected
                 )
             }
-            DBError::UnexpectedToken { expected } => {
-                write!(f, "Unexpected token, expected {:?}", expected)
+            DBError::UnexpectedEof { expected } => {
+                write!(f, "Unexpected end of file, expected {:?}", expected)
+            }
+            DBError::UnexpectedToken { found } => {
+                write!(f, "Unexpected token: {:?}", found)
             }
             DBError::IdentExpected(token) => {
                 write!(f, "Identifier expected, found {:?}", token)

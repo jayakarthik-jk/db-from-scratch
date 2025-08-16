@@ -1,6 +1,5 @@
 use super::{Column, Statement};
 use crate::{
-    common::layer::Layer,
     error::{DBError, IntoParseResult},
     lexer::{
         keyword::Keyword,
@@ -19,9 +18,9 @@ pub(crate) enum AlterType {
     Rename { old: Ident, new: Ident },
 }
 
-impl<TokenLayer> Parser<TokenLayer>
+impl<Tokens> Parser<Tokens>
 where
-    TokenLayer: Layer<Token, DBError>,
+    Tokens: Iterator<Item = Result<Token, DBError>>,
 {
     pub(crate) fn parse_alter_statement(&mut self) -> Result<Statement, DBError> {
         self.expect(TokenKind::Keyword(Keyword::Table))?;
