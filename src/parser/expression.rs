@@ -1,10 +1,9 @@
 use super::operators::binary::BinaryOperator;
-use crate::frontend::lexer::{literal::Literal, token::Ident};
+use crate::lexer::{literal::Literal, token::Ident};
 use std::fmt::Display;
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum Expression {
-    Wildcard,
     Literal(Literal),
     Identifier(Ident),
     FunctionCall {
@@ -22,7 +21,6 @@ pub(crate) enum Expression {
 impl Display for Expression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Expression::Wildcard => write!(f, "*"),
             Expression::Literal(literal) => write!(f, "{}", literal),
             Expression::Identifier(ident) => write!(f, "{}", ident),
             Expression::FunctionCall { ident, arguments } => {

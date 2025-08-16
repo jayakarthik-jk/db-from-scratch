@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::frontend::lexer::keyword::Keyword;
+use crate::lexer::keyword::Keyword;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Datatype {

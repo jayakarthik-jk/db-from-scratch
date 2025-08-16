@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::frontend::lexer::{keyword::Keyword, token::TokenKind, LexerError, Token};
+use crate::lexer::{keyword::Keyword, token::TokenKind, LexerError, Token};
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum ParserError {
@@ -34,7 +34,11 @@ impl Display for ParserError {
             ParserError::NotAnExpression => write!(f, "Not an expression"),
             ParserError::LexerError(err) => write!(f, "{}", err),
             ParserError::Unexpected { found, expected } => {
-                write!(f, "Unexpected token: found {:?}, expected {:?}", found, expected)
+                write!(
+                    f,
+                    "Unexpected token: found {:?}, expected {:?}",
+                    found, expected
+                )
             }
             ParserError::UnexpectedToken { expected } => {
                 write!(f, "Unexpected token, expected {:?}", expected)

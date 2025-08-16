@@ -6,7 +6,7 @@ pub(crate) mod token;
 
 use std::fmt::Display;
 
-use crate::util::layer::Layer;
+use crate::common::layer::Layer;
 use keyword::Keyword;
 use literal::Literal;
 use reader::{Character, Position};

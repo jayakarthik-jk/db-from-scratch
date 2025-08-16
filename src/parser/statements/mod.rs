@@ -7,7 +7,7 @@ pub(crate) mod select;
 pub(crate) mod update;
 
 use super::{datatype::Datatype, expression::Expression};
-use crate::frontend::lexer::token::Ident;
+use crate::lexer::token::Ident;
 use alter::AlterType;
 use std::fmt::Display;
 use update::UpdateSet;

@@ -10,7 +10,7 @@ use super::lexer::{
     token::{Ident, TokenKind},
     LexerError, Token,
 };
-use crate::util::layer::Layer;
+use crate::common::layer::Layer;
 use error::ParserError;
 use expression::Expression;
 use operators::binary::BinaryOperator;
@@ -205,11 +205,6 @@ where
                 let expression = self.parse_expression()?;
                 self.expect(TokenKind::Symbol(Symbol::CloseParanthesis))?;
                 Ok(expression)
-            }
-            TokenKind::Symbol(Symbol::Star) => {
-                // This is a special case for `SELECT *`
-                // We treat it as a wildcard expression
-                Ok(Expression::Wildcard)
             }
             _ => {
                 self.tokens.rewind(token);

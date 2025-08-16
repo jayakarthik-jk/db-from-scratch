@@ -1,12 +1,12 @@
 use std::fmt::Display;
 
 use crate::{
-    frontend::{
+    common::layer::Layer,
+    Parser,
+    {
         lexer::{keyword::Keyword, symbol::Symbol, token::TokenKind, LexerError, Token},
         parser::error::ParserError,
     },
-    util::layer::Layer,
-    Parser,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

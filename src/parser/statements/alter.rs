@@ -1,6 +1,8 @@
 use super::{Column, Statement};
 use crate::{
-    frontend::{
+    common::layer::Layer,
+    Parser,
+    {
         lexer::{
             keyword::Keyword,
             symbol::Symbol,
@@ -9,8 +11,6 @@ use crate::{
         },
         parser::error::{IntoParseResult, ParserError},
     },
-    util::layer::Layer,
-    Parser,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]

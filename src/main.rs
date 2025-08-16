@@ -1,17 +1,15 @@
 // pub(crate) mod backend;
-pub(crate) mod frontend;
-#[macro_use]
-pub(crate) mod util;
-#[cfg(test)]
-pub(crate) mod test;
+pub(crate) mod common;
+pub(crate) mod lexer;
+pub(crate) mod parser;
 
 use std::io::{self, Write};
 
-use frontend::{
+use common::layer::BufferedLayer;
+use {
     lexer::{reader::CharacterIterator, Lexer},
     parser::Parser,
 };
-use util::layer::BufferedLayer;
 
 fn main() {
     let stdin = io::stdin();
@@ -31,7 +29,8 @@ fn main() {
                 return;
             }
         }
-        let reader = CharacterIterator::new(std::io::Cursor::new(command.clone()));
+
+        let reader = CharacterIterator::new(std::io::Cursor::new(command));
         let lexer = Lexer::new(BufferedLayer::new(reader));
         let parser = Parser::new(BufferedLayer::new(lexer));
         parser.for_each(|statement| {
