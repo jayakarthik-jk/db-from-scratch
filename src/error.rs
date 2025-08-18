@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::lexer::{keyword::Keyword, reader::Position, token::TokenKind, Token};
+use crate::lexer::{keyword::Keyword, source::Position, token::TokenKind, Token};
 
 #[derive(Debug, Clone)]
 pub(crate) enum DBError {
@@ -34,7 +34,6 @@ impl Display for DBError {
             DBError::IllegalCharacter(ch, pos) => {
                 write!(f, "Illegal character '{}' at position: {:?}", ch, pos)
             }
-
 
             DBError::Unexpected { found, expected } => {
                 write!(
