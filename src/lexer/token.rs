@@ -1,4 +1,6 @@
-use super::{keyword::Keyword, literal::Literal, symbol::Symbol, Position};
+use crate::{common::position::Span, lexer::literal::Literal};
+
+use super::{keyword::Keyword, symbol::Symbol, Position};
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum TokenKind {
@@ -14,25 +16,9 @@ pub(crate) struct Token {
     pub(crate) span: Span,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct Span {
-    pub(crate) start: Position,
-    pub(crate) end: Position,
-}
-
 impl Token {
     pub(crate) fn new(kind: TokenKind, span: Span) -> Self {
         Self { kind, span }
-    }
-
-    pub(crate) fn from_keyword(keyword: Keyword, position: Position) -> Self {
-        Self {
-            kind: TokenKind::Keyword(keyword),
-            span: Span {
-                start: position,
-                end: position + keyword.to_string().len(),
-            },
-        }
     }
 
     pub(crate) fn from_symbol(symbol: Symbol, position: Position) -> Self {
@@ -40,7 +26,7 @@ impl Token {
             kind: TokenKind::Symbol(symbol),
             span: Span {
                 start: position,
-                end: position + symbol.to_string().len(),
+                end: position + (symbol.to_string().len() - 1usize),
             },
         }
     }

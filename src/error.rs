@@ -1,11 +1,15 @@
 use std::fmt::Display;
 
-use crate::lexer::{keyword::Keyword, reader::Position, token::TokenKind, Token};
+use crate::{
+    common::position::Position,
+    lexer::{keyword::Keyword, token::TokenKind, Token},
+};
 
 #[derive(Debug, Clone)]
 pub(crate) enum DBError {
     // Lexer errors
     UnTerminatedStringLiteral(Position),
+    UnterminatedNumberLiteral(Position),
     NumberExceededSize(Position),
     IllegalCharacter(char, Position),
 
@@ -28,13 +32,15 @@ impl Display for DBError {
             DBError::UnTerminatedStringLiteral(pos) => {
                 write!(f, "Unterminated string literal at position: {:?}", pos)
             }
+            DBError::UnterminatedNumberLiteral(pos) => {
+                write!(f, "Unterminated number literal at position: {:?}", pos)
+            }
             DBError::NumberExceededSize(pos) => {
                 write!(f, "Number exceeded size limit at position: {:?}", pos)
             }
             DBError::IllegalCharacter(ch, pos) => {
                 write!(f, "Illegal character '{}' at position: {:?}", ch, pos)
             }
-
 
             DBError::Unexpected { found, expected } => {
                 write!(

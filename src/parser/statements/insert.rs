@@ -16,7 +16,10 @@ where
 
         let mut columns = None;
 
-        if self.next_if(TokenKind::Symbol(Symbol::OpenParanthesis)).is_some() {
+        if self
+            .consume_if(TokenKind::Symbol(Symbol::OpenParanthesis))
+            .is_some()
+        {
             let column_names =
                 self.parse_seperated(Symbol::Comma, |parser| parser.expect_ident())?;
             self.expect(TokenKind::Symbol(Symbol::CloseParanthesis))?;

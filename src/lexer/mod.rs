@@ -1,17 +1,23 @@
 pub(crate) mod keyword;
 pub(crate) mod literal;
-pub(crate) mod reader;
+pub(crate) mod source;
 pub(crate) mod symbol;
 pub(crate) mod token;
 
-use crate::error::DBError;
+use crate::{
+    common::{
+        peekable_ext::ConsumeIf,
+        position::{Position, Span},
+    },
+    error::DBError,
+};
 use keyword::Keyword;
 use literal::Literal;
-use reader::{Character, Position};
+use source::Character;
 use std::iter::Peekable;
 use symbol::Symbol;
 pub(crate) use token::Token;
-use token::{Span, TokenKind};
+use token::TokenKind;
 
 pub(crate) struct Lexer<Characters>
 where
@@ -103,8 +109,7 @@ where
 
                 // skip comments
                 '#' => {
-                    self.characters
-                        .find(|ch| ch.value != '\n');
+                    self.characters.find(|ch| ch.value != '\n');
                     continue;
                 }
 
@@ -134,7 +139,7 @@ where
     }
 
     fn if_next(&mut self, expected: char) -> bool {
-        self.characters.next_if(|ch| ch.value == expected).is_some()
+        self.characters.if_consume(|ch| ch.value == expected)
     }
 
     fn next_character(&mut self) -> Option<Character> {
@@ -147,7 +152,7 @@ where
 
         while let Some(next_ch) = self
             .characters
-            .next_if(|next_ch| next_ch.value.is_ascii_digit())
+            .consume_if(|next_ch| next_ch.value.is_ascii_digit())
         {
             number_as_string.push(next_ch.value);
             last_position = next_ch.position;
@@ -161,15 +166,13 @@ where
         enclosing: Character,
     ) -> Result<Token, DBError> {
         let mut word = String::new();
-        println!("Collecting string literal starting with: {}", enclosing.value);
         while let Some(next_ch) = self
             .characters
-            .next_if(|next_ch| next_ch.value != enclosing.value && next_ch.value != '\n')
+            .consume_if(|next_ch| next_ch.value != enclosing.value && next_ch.value != '\n')
         {
-            println!("Collecting string literal: {}", next_ch.value);
             word.push(next_ch.value);
         }
-        if let Some(last) = self.characters.next_if(|ch| ch.value == enclosing.value) {
+        if let Some(last) = self.characters.consume_if(|ch| ch.value == enclosing.value) {
             return Ok(Token::new(
                 TokenKind::Literal(word.into()),
                 Span {
@@ -188,10 +191,14 @@ where
     ) -> Result<Token, DBError> {
         let (number_as_string, last_position) = self.collect_rest_of_number(initial_char);
 
-        if let Some(next_ch) = self.characters.next_if(|ch| ch.value == '.') {
+        if let Some(next_ch) = self.characters.consume_if(|ch| ch.value == '.') {
             // Collect the fractional part of the number.
             let (fraction_ch, last_position) = self.collect_rest_of_number(next_ch);
-            let full_number = format!("{}.{}", number_as_string, fraction_ch);
+            if fraction_ch.len() == 1 {
+                // If the fractional part is just a single character, it's invalid.
+                return Err(DBError::UnterminatedNumberLiteral(next_ch.position));
+            }
+            let full_number = format!("{}{}", number_as_string, fraction_ch);
 
             // Parse as a floating-point number.
             match full_number.parse::<f64>() {
@@ -221,34 +228,27 @@ where
 
     pub(crate) fn collect_ident(&mut self, ch: Character) -> Token {
         let mut word = String::from(ch.value);
-        let mut last_position = ch.position;
+        let mut last = ch;
 
         while let Some(next_ch) = self
             .characters
-            .next_if(|next_ch| Self::is_valid_ident(next_ch.value))
+            .consume_if(|next_ch| Self::is_valid_ident(next_ch.value))
         {
             word.push(next_ch.value);
-            last_position = next_ch.position;
+            last = next_ch;
         }
 
+        let span = Span {
+            start: ch.position,
+            end: last.position,
+        };
+
         if let Some(keyword) = Keyword::get_keyword_kind(&word) {
-            Token::from_keyword(keyword, ch.position)
+            Token::new(TokenKind::Keyword(keyword), span)
         } else if let Some(literal) = Literal::get_literal(&word) {
-            Token::new(
-                TokenKind::Literal(literal),
-                Span {
-                    start: ch.position,
-                    end: last_position,
-                },
-            )
+            Token::new(TokenKind::Literal(literal), span)
         } else {
-            Token::new(
-                TokenKind::Ident(word),
-                Span {
-                    start: ch.position,
-                    end: last_position,
-                },
-            )
+            Token::new(TokenKind::Ident(word), span)
         }
     }
 

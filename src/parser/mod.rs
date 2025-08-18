@@ -11,7 +11,7 @@ use super::lexer::{
     token::{Ident, TokenKind},
     Token,
 };
-use crate::error::DBError;
+use crate::{common::peekable_ext::ConsumeIf, error::DBError};
 use expression::Expression;
 use operators::binary::BinaryOperator;
 use statements::Statement;
@@ -95,9 +95,9 @@ where
         }
     }
 
-    fn next_if(&mut self, expected: TokenKind) -> Option<Result<Token, DBError>> {
+    fn consume_if(&mut self, expected: TokenKind) -> Option<Result<Token, DBError>> {
         self.tokens
-            .next_if(|token| matches!(token, Ok(Token { kind, .. }) if *kind == expected))
+            .consume_if(|token| matches!(token, Ok(Token { kind, .. }) if *kind == expected))
     }
 
     fn expect_keyword_kind(&mut self) -> Result<Keyword, DBError> {
@@ -121,7 +121,10 @@ where
     }
 
     fn parse_predicate(&mut self) -> Result<Option<Expression>, DBError> {
-        if self.next_if(TokenKind::Keyword(Keyword::Where)).is_some() {
+        if self
+            .consume_if(TokenKind::Keyword(Keyword::Where))
+            .is_some()
+        {
             Ok(Some(self.parse_expression()?))
         } else {
             Ok(None)
@@ -138,7 +141,7 @@ where
         }
 
         // Handle NOT operator
-        if self.next_if(TokenKind::Keyword(Keyword::Not)).is_some() {
+        if self.consume_if(TokenKind::Keyword(Keyword::Not)).is_some() {
             let next_expression = self.parse_expression_of(precedence - 1)?;
             return Ok(Expression::Negation(Box::new(next_expression)));
         }
@@ -180,7 +183,7 @@ where
             TokenKind::Literal(literal) => Ok(Expression::Literal(literal)),
             TokenKind::Ident(ident) => {
                 if self
-                    .next_if(TokenKind::Symbol(Symbol::OpenParanthesis))
+                    .consume_if(TokenKind::Symbol(Symbol::OpenParanthesis))
                     .is_some()
                 {
                     let expressions = self.parse_separated_expressions(Symbol::Comma)?;
@@ -223,7 +226,7 @@ where
             let expr = callback(self)?;
             expressions.push(expr);
             // Ensure separator before each expression
-            if self.next_if(TokenKind::Symbol(separator)).is_none() {
+            if self.consume_if(TokenKind::Symbol(separator)).is_none() {
                 break;
             }
         }

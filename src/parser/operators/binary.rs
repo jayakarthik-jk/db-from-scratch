@@ -1,7 +1,9 @@
 use std::fmt::Display;
 
 use crate::{
-    error::DBError, lexer::{keyword::Keyword, symbol::Symbol, token::TokenKind, Token}, Parser
+    error::DBError,
+    lexer::{keyword::Keyword, symbol::Symbol, token::TokenKind, Token},
+    Parser,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -75,32 +77,23 @@ impl BinaryOperator {
             Token {
                 kind: TokenKind::Symbol(symbol),
                 ..
-            } => {
-                Self::match_symbol_with_precedence(symbol, precedence)?
-            }
+            } => Self::match_symbol_with_precedence(symbol, precedence)?,
             Token {
                 kind: TokenKind::Keyword(keyword),
                 ..
-            } => {
-                
-                match keyword {
-                    Keyword::And if BinaryOperator::And.precedence() == precedence => {
-                        BinaryOperator::And
-                    }
-                    Keyword::Or if BinaryOperator::Or.precedence() == precedence => {
-                        BinaryOperator::Or
-                    }
-                    Keyword::In if BinaryOperator::In.precedence() == precedence => {
-                        BinaryOperator::In
-                    }
-                    Keyword::Like if BinaryOperator::Like.precedence() == precedence => {
-                        BinaryOperator::Like
-                    }
-                    _ => return None
+            } => match keyword {
+                Keyword::And if BinaryOperator::And.precedence() == precedence => {
+                    BinaryOperator::And
                 }
-            }
+                Keyword::Or if BinaryOperator::Or.precedence() == precedence => BinaryOperator::Or,
+                Keyword::In if BinaryOperator::In.precedence() == precedence => BinaryOperator::In,
+                Keyword::Like if BinaryOperator::Like.precedence() == precedence => {
+                    BinaryOperator::Like
+                }
+                _ => return None,
+            },
 
-            _ => return None
+            _ => return None,
         };
 
         assert!(parser.tokens.next().is_some());

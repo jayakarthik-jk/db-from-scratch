@@ -12,7 +12,7 @@ where
     pub(crate) fn parse_select_statement(&mut self) -> Result<Statement, DBError> {
         let expressions = self.parse_separated_expressions(Symbol::Comma)?;
 
-        if self.next_if(TokenKind::Keyword(Keyword::From)).is_none() {
+        if self.consume_if(TokenKind::Keyword(Keyword::From)).is_none() {
             return Ok(Statement::Select {
                 select_expressions: expressions,
                 from: None,

@@ -8,10 +8,8 @@ pub(crate) mod parser;
 use std::io::{self, Write};
 
 use analyzer::Analyzer;
-use {
-    lexer::{reader::CharacterIterator, Lexer},
-    parser::Parser,
-};
+use lexer::source::Source;
+use {lexer::Lexer, parser::Parser};
 
 fn main() {
     let stdin = io::stdin();
@@ -32,8 +30,9 @@ fn main() {
             }
         }
 
-        let reader = CharacterIterator::new(std::io::Cursor::new(command));
-        let lexer = Lexer::new(reader);
+        let source = Source::new(std::io::Cursor::new(command));
+
+        let lexer = Lexer::new(source.iter());
         let parser = Parser::new(lexer);
         let analyzer = Analyzer::new(parser);
 
