@@ -1,21 +1,17 @@
 use super::{Column, Statement};
 use crate::{
+    common::position::Span,
     error::{DBError, IntoParseResult},
-    lexer::{
-        keyword::Keyword,
-        symbol::Symbol,
-        token::{Ident, TokenKind},
-        Token,
-    },
+    lexer::{keyword::Keyword, symbol::Symbol, token::TokenKind, Token},
     Parser,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum AlterType {
     Add(Column),
-    Drop(Ident),
+    Drop(Span),
     Modify(Column),
-    Rename { old: Ident, new: Ident },
+    Rename { old: Span, new: Span },
 }
 
 impl<Tokens> Parser<Tokens>
@@ -54,8 +50,8 @@ where
             Keyword::Drop => {
                 self.expect(TokenKind::Keyword(Keyword::Column))?;
                 let column_name_token = self.get_next_token()?;
-                if let TokenKind::Ident(column_name) = column_name_token.kind {
-                    AlterType::Drop(column_name)
+                if let TokenKind::Ident = column_name_token.kind {
+                    AlterType::Drop(column_name_token.span)
                 } else {
                     return "Table name expected after DROP COLUMN".as_err();
                 }
@@ -69,8 +65,8 @@ where
                 self.expect(TokenKind::Keyword(Keyword::Column))?;
                 let old_name_token = self.get_next_token()?;
                 let Token {
-                    kind: TokenKind::Ident(old),
-                    ..
+                    kind: TokenKind::Ident,
+                    span: old,
                 } = old_name_token
                 else {
                     return "Old column name expected after RENAME COLUMN".as_err();
@@ -79,8 +75,8 @@ where
 
                 let new_name_token = self.get_next_token()?;
                 let Token {
-                    kind: TokenKind::Ident(new),
-                    ..
+                    kind: TokenKind::Ident,
+                    span: new,
                 } = new_name_token
                 else {
                     return "New column name expected after RENAME COLUMN".as_err();

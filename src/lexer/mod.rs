@@ -1,6 +1,5 @@
 pub(crate) mod keyword;
 pub(crate) mod literal;
-pub(crate) mod source;
 pub(crate) mod symbol;
 pub(crate) mod token;
 
@@ -9,11 +8,10 @@ use crate::{
         peekable_ext::ConsumeIf,
         position::{Position, Span},
     },
-    error::DBError,
+    error::DBError, source::Atom,
 };
 use keyword::Keyword;
-use literal::Literal;
-use source::Atom;
+use literal::LiteralType;
 use std::iter::Peekable;
 use symbol::Symbol;
 pub(crate) use token::Token;
@@ -105,7 +103,7 @@ where
 
                 '~' => Token::from_symbol(Symbol::BitNot, ch.position),
 
-                '\"' | '\'' => match self.collect_string_literal(ch) {
+                '\"' | '\'' => match self.consume_string(ch) {
                     Ok(token) => token,
                     err => return Some(err),
                 },
@@ -117,12 +115,12 @@ where
                 }
 
                 // Numeric Literals
-                ch_val if ch_val.is_ascii_digit() => match self.collect_numeric_literal(ch) {
+                ch_val if ch_val.is_ascii_digit() => match self.consume_numeric_literal(ch) {
                     Ok(token) => token,
                     err => return Some(err),
                 },
                 // Identifiers and keywords
-                ch_val if Self::is_valid_ident(ch_val) => self.collect_ident(ch),
+                ch_val if Self::is_valid_ident(ch_val) => self.consume_identifier(ch),
 
                 value => {
                     return Some(Err(DBError::IllegalCharacter(value, ch.position)));
@@ -153,81 +151,57 @@ where
         self.atoms.next()
     }
 
-    fn collect_rest_of_number(&mut self, initial_char: Atom) -> (String, Position) {
-        let mut number_as_string = String::from(initial_char.value);
+    fn consume_numbers(&mut self, initial_char: Atom) -> Position {
         let mut last_position = initial_char.position;
 
         while let Some(next_ch) = self
             .atoms
             .consume_if(|next_ch| next_ch.value.is_ascii_digit())
         {
-            number_as_string.push(next_ch.value);
             last_position = next_ch.position;
         }
 
-        (number_as_string, last_position)
+        last_position
     }
 
-    pub(crate) fn collect_string_literal(&mut self, enclosing: Atom) -> Result<Token, DBError> {
-        let mut word = String::new();
-        while let Some(next_ch) = self
-            .atoms
-            .consume_if(|next_ch| next_ch.value != enclosing.value && next_ch.value != '\n')
-        {
-            word.push(next_ch.value);
-        }
+    pub(crate) fn consume_string(&mut self, enclosing: Atom) -> Result<Token, DBError> {
+        self.atoms
+            .consume_while(|next_ch| next_ch.value != enclosing.value && next_ch.value != '\n');
+        let mut span = Span {
+            start: enclosing.position,
+            end: enclosing.position,
+        };
         if let Some(last) = self.atoms.consume_if(|ch| ch.value == enclosing.value) {
-            return Ok(Token::new(
-                TokenKind::Literal(word.into()),
-                Span {
-                    start: enclosing.position,
-                    end: last.position,
-                },
-            ));
+            span.end = last.position;
+            return Ok(Token::new(TokenKind::Literal(LiteralType::String), span));
         }
         // If we reach here, it means we didn't find a closing quote.
-        Err(DBError::UnTerminatedStringLiteral(enclosing.position))
+        Err(DBError::UnTerminatedString(span))
     }
 
-    pub(crate) fn collect_numeric_literal(&mut self, initial_char: Atom) -> Result<Token, DBError> {
-        let (number_as_string, last_position) = self.collect_rest_of_number(initial_char);
+    pub(crate) fn consume_numeric_literal(&mut self, initial_char: Atom) -> Result<Token, DBError> {
+        let mut span = Span {
+            start: initial_char.position,
+            end: self.consume_numbers(initial_char),
+        };
 
-        if let Some(next_ch) = self.atoms.consume_if(|ch| ch.value == '.') {
+        let token = if let Some(next_ch) = self.atoms.consume_if(|ch| ch.value == '.') {
             // Collect the fractional part of the number.
-            let (fraction_ch, last_position) = self.collect_rest_of_number(next_ch);
-            if fraction_ch.len() == 1 {
+            span.end = self.consume_numbers(next_ch);
+            if span.end == next_ch.position {
                 // If the fractional part is just a single character, it's invalid.
-                return Err(DBError::UnterminatedNumberLiteral(next_ch.position));
+                return Err(DBError::UnterminatedFloat(span));
             }
-            let full_number = format!("{}{}", number_as_string, fraction_ch);
 
-            // Parse as a floating-point number.
-            match full_number.parse::<f64>() {
-                Ok(number) => Ok(Token::new(
-                    TokenKind::Literal(number.into()),
-                    Span {
-                        start: initial_char.position,
-                        end: last_position,
-                    },
-                )),
-                Err(_) => Err(DBError::NumberExceededSize(initial_char.position)),
-            }
+            Token::new(TokenKind::Literal(LiteralType::Float), span)
         } else {
-            // Parse as an integer if no fractional part.
-            match number_as_string.parse::<i32>() {
-                Ok(number) => Ok(Token::new(
-                    TokenKind::Literal(number.into()),
-                    Span {
-                        start: initial_char.position,
-                        end: last_position,
-                    },
-                )),
-                Err(_) => Err(DBError::NumberExceededSize(initial_char.position)),
-            }
-        }
+            Token::new(TokenKind::Literal(LiteralType::Integer), span)
+        };
+
+        Ok(token)
     }
 
-    pub(crate) fn collect_ident(&mut self, ch: Atom) -> Token {
+    pub(crate) fn consume_identifier(&mut self, ch: Atom) -> Token {
         let mut word = String::from(ch.value);
         let mut last = ch;
 
@@ -246,10 +220,10 @@ where
 
         if let Some(keyword) = Keyword::get_keyword_kind(&word) {
             Token::new(TokenKind::Keyword(keyword), span)
-        } else if let Some(literal) = Literal::get_literal(&word) {
+        } else if let Some(literal) = LiteralType::get_literal(&word) {
             Token::new(TokenKind::Literal(literal), span)
         } else {
-            Token::new(TokenKind::Ident(word), span)
+            Token::new(TokenKind::Ident, span)
         }
     }
 

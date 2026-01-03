@@ -1,13 +1,12 @@
-pub(crate) mod analyzer;
 pub(crate) mod common;
 pub(crate) mod error;
 pub(crate) mod lexer;
 pub(crate) mod parser;
+pub(crate) mod source;
 
 use std::io::{self, Cursor, Write};
 
-use crate::lexer::source::SplitRawStatements;
-use analyzer::Analyzer;
+use crate::source::SplitRawStatements;
 
 use {lexer::Lexer, parser::Parser};
 
@@ -32,11 +31,10 @@ fn main() {
         for raw_statement in Cursor::new(command).split_raw_statements() {
             let lexer = Lexer::new(raw_statement.iter());
             let parser = Parser::new(lexer);
-            let analyzer = Analyzer::new(parser);
 
-            analyzer.for_each(|statement| match statement {
+            parser.for_each(|st| match st {
                 Err(err) => {
-                    eprintln!("Error: {}", err);
+                    err.print(&raw_statement);
                 }
                 Ok(s) => {
                     println!("{:?}", s);

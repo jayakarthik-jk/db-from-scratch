@@ -11,6 +11,9 @@ where
     where
         F: FnMut(&I) -> bool;
 
+    /// Checks if the next element matches the predicate and consumes it if it does.
+    ///
+    /// Returns `true` if an element was consumed, `false` otherwise.
     fn if_consume<F>(&mut self, predicate: F) -> bool
     where
         F: FnMut(&I) -> bool,
@@ -18,16 +21,16 @@ where
         self.consume_if(predicate).is_some()
     }
 
-    // fn consume_while<F>(&mut self, mut predicate: F) -> Option<I>
-    // where
-    //     F: FnMut(&I) -> bool,
-    // {
-    //     let mut last = None;
-    //     while let Some(item) = self.consume_if(&mut predicate) {
-    //         last = Some(item);
-    //     }
-    //     last
-    // }
+    fn consume_while<F>(&mut self, mut predicate: F) -> Option<I>
+    where
+        F: FnMut(&I) -> bool,
+    {
+        let mut last = None;
+        while let Some(item) = self.consume_if(&mut predicate) {
+            last = Some(item);
+        }
+        last
+    }
 }
 
 impl<T, I> ConsumeIf<T, I> for Peekable<T>

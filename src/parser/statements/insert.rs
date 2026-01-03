@@ -12,7 +12,7 @@ where
     pub(crate) fn parse_insert_statement(&mut self) -> Result<Statement, DBError> {
         self.expect(TokenKind::Keyword(Keyword::Into))?;
 
-        let table_name = self.expected_identifier()?;
+        let table_name = self.expect_identifier()?;
 
         let mut columns = None;
 
@@ -21,7 +21,7 @@ where
             .is_some()
         {
             let column_names =
-                self.parse_seperated(Symbol::Comma, |parser| parser.expect_ident())?;
+                self.parse_seperated(Symbol::Comma, |parser| parser.expect_identifier())?;
             self.expect(TokenKind::Symbol(Symbol::CloseParanthesis))?;
             columns = Some(column_names);
         }

@@ -20,7 +20,7 @@ where
             });
         }
 
-        let table_name = self.expected_identifier()?;
+        let table_name = self.expect_identifier()?;
 
         let predicate = self.parse_predicate()?;
 

@@ -1,11 +1,7 @@
 use crate::{
+    common::position::Span,
     error::DBError,
-    lexer::{
-        keyword::Keyword,
-        symbol::Symbol,
-        token::{Ident, TokenKind},
-        Token,
-    },
+    lexer::{keyword::Keyword, symbol::Symbol, token::TokenKind, Token},
     parser::expression::Expression,
     Parser,
 };
@@ -14,7 +10,7 @@ use super::Statement;
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct UpdateSet {
-    pub(crate) column: Ident,
+    pub(crate) column: Span,
     pub(crate) value: Expression,
 }
 
@@ -23,7 +19,7 @@ where
     Tokens: Iterator<Item = Result<Token, DBError>>,
 {
     pub(crate) fn parse_update_statement(&mut self) -> Result<Statement, DBError> {
-        let table_name = self.expect_ident()?;
+        let table_name = self.expect_identifier()?;
 
         self.expect(TokenKind::Keyword(Keyword::Set))?;
 
@@ -39,7 +35,7 @@ where
     }
 
     pub(crate) fn parse_update_set(&mut self) -> Result<UpdateSet, DBError> {
-        let column = self.expect_ident()?;
+        let column = self.expect_identifier()?;
 
         self.expect(TokenKind::Symbol(Symbol::Equal))?;
 

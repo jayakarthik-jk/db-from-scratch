@@ -1,13 +1,12 @@
 use super::operators::binary::BinaryOperator;
-use crate::lexer::{literal::Literal, token::Ident};
-use std::fmt::Display;
+use crate::{common::position::Span, lexer::literal::LiteralType};
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum Expression {
-    Literal(Literal),
-    Ident(Ident),
+    Literal(LiteralType, Span),
+    Ident(Span),
     FunctionCall {
-        ident: Ident,
+        name: Span,
         arguments: Vec<Expression>,
     },
     Binary {
@@ -16,33 +15,4 @@ pub(crate) enum Expression {
         right: Box<Expression>,
     },
     Negation(Box<Expression>),
-}
-
-impl Display for Expression {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Expression::Literal(literal) => write!(f, "{}", literal),
-            Expression::Ident(ident) => write!(f, "{}", ident),
-            Expression::FunctionCall { ident, arguments } => {
-                write!(f, "{}(", ident)?;
-                for (i, arg) in arguments.iter().enumerate() {
-                    if i > 0 {
-                        write!(f, ", ")?;
-                    }
-                    write!(f, "{}", arg)?;
-                }
-                write!(f, ")")
-            }
-            Expression::Binary {
-                left,
-                operator,
-                right,
-            } => {
-                write!(f, "{} {} {}", left, operator, right)
-            }
-            Expression::Negation(expr) => {
-                write!(f, "NOT ({})", expr)
-            }
-        }
-    }
 }

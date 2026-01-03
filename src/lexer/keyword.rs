@@ -2,9 +2,12 @@ use std::fmt::Display;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub(crate) enum Keyword {
-    Create,
+
+    Database,
     Table,
-    Alter,
+
+    Create,
+    // Alter,
     Drop,
     Insert,
     Update,
@@ -36,8 +39,9 @@ impl Keyword {
     pub(crate) fn get_keyword_kind(keyword: &str) -> Option<Keyword> {
         let keyword = match keyword.to_lowercase().as_str() {
             "create" => Keyword::Create,
+            "database" => Keyword::Database,
             "table" => Keyword::Table,
-            "alter" => Keyword::Alter,
+            // "alter" => Keyword::Alter,
             "drop" => Keyword::Drop,
             "insert" => Keyword::Insert,
             "update" => Keyword::Update,
@@ -72,9 +76,11 @@ impl Keyword {
 impl Display for Keyword {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let keyword_str = match self {
-            Keyword::Create => "CREATE",
             Keyword::Table => "TABLE",
-            Keyword::Alter => "ALTER",
+            Keyword::Database => "DATABASE",
+
+            Keyword::Create => "CREATE",
+            // Keyword::Alter => "ALTER",
             Keyword::Drop => "DROP",
             Keyword::Insert => "INSERT",
             Keyword::Update => "UPDATE",

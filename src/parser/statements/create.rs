@@ -13,7 +13,24 @@ where
     pub(crate) fn parse_create_statement(&mut self) -> Result<Statement, DBError> {
         self.expect(TokenKind::Keyword(Keyword::Create))?;
 
-        let table_name = self.expected_identifier()?;
+        // expect either "DATABASE" or "TABLE"
+        let keyword = self.expect_keyword_kind()?;
+
+        match keyword {
+            Keyword::Database => {
+                let database_name = self.expect_identifier()?;
+                Ok(Statement::CreateDatabase { database_name })
+            }
+            Keyword::Table => self.parse_table_definition(),
+            keyword => Err(DBError::UnexpectedKeyword {
+                found: keyword,
+                allowed: vec![Keyword::Database, Keyword::Table],
+            }),
+        }
+    }
+
+    pub(crate) fn parse_table_definition(&mut self) -> Result<Statement, DBError> {
+        let table_name = self.expect_identifier()?;
 
         self.expect(TokenKind::Symbol(Symbol::OpenParanthesis))?;
 
@@ -30,7 +47,7 @@ where
     }
 
     pub(crate) fn parse_create_statement_column(&mut self) -> Result<Column, DBError> {
-        let ident = self.expected_identifier()?;
+        let ident = self.expect_identifier()?;
 
         let data_type_token = self.get_next_token()?;
         let data_type = match data_type_token.kind {

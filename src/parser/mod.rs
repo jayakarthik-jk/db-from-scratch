@@ -5,13 +5,11 @@ pub(crate) mod statements;
 
 use std::iter::Peekable;
 
-use super::lexer::{
-    keyword::Keyword,
-    symbol::Symbol,
-    token::{Ident, TokenKind},
-    Token,
+use super::lexer::{keyword::Keyword, symbol::Symbol, token::TokenKind, Token};
+use crate::{
+    common::{peekable_ext::ConsumeIf, position::Span},
+    error::DBError,
 };
-use crate::{common::peekable_ext::ConsumeIf, error::DBError};
 use expression::Expression;
 use operators::binary::BinaryOperator;
 use statements::Statement;
@@ -38,7 +36,7 @@ where
 
         let statement = match keyword {
             Keyword::Create => self.parse_create_statement(),
-            Keyword::Alter => self.parse_alter_statement(),
+            // Keyword::Alter => self.parse_alter_statement(),
             Keyword::Drop => self.parse_drop_statement(),
             Keyword::Insert => self.parse_insert_statement(),
             Keyword::Select => self.parse_select_statement(),
@@ -110,12 +108,12 @@ where
         }
     }
 
-    fn expected_identifier(&mut self) -> Result<Ident, DBError> {
+    fn expect_identifier(&mut self) -> Result<Span, DBError> {
         match self.get_next_token()? {
             Token {
-                kind: TokenKind::Ident(ident),
-                ..
-            } => Ok(ident),
+                kind: TokenKind::Ident,
+                span,
+            } => Ok(span),
             token => Err(DBError::IdentExpected(token)),
         }
     }
@@ -168,21 +166,11 @@ where
         Ok(left)
     }
 
-    fn expect_ident(&mut self) -> Result<Ident, DBError> {
-        match self.get_next_token()? {
-            Token {
-                kind: TokenKind::Ident(ident),
-                ..
-            } => Ok(ident),
-            token => Err(DBError::IdentExpected(token)),
-        }
-    }
-
     fn parse_factor(&mut self) -> Result<Expression, DBError> {
         let token = self.get_next_token()?;
         match token.kind {
-            TokenKind::Literal(literal) => Ok(Expression::Literal(literal)),
-            TokenKind::Ident(ident) => {
+            TokenKind::Literal(literal) => Ok(Expression::Literal(literal, token.span)),
+            TokenKind::Ident => {
                 if self
                     .consume_if(TokenKind::Symbol(Symbol::OpenParanthesis))
                     .is_some()
@@ -190,11 +178,11 @@ where
                     let expressions = self.parse_separated_expressions(Symbol::Comma)?;
                     self.expect(TokenKind::Symbol(Symbol::CloseParanthesis))?;
                     Ok(Expression::FunctionCall {
-                        ident,
+                        name: token.span,
                         arguments: expressions,
                     })
                 } else {
-                    Ok(Expression::Ident(ident))
+                    Ok(Expression::Ident(token.span))
                 }
             }
             TokenKind::Symbol(Symbol::OpenParanthesis) => {

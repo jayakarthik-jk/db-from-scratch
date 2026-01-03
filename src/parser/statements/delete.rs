@@ -11,7 +11,7 @@ where
 {
     pub(crate) fn parse_delete_statement(&mut self) -> Result<Statement, DBError> {
         self.expect(TokenKind::Keyword(Keyword::From))?;
-        let table_name = self.expected_identifier()?;
+        let table_name = self.expect_identifier()?;
         let predicate = self.parse_predicate()?;
 
         Ok(Statement::Delete {
