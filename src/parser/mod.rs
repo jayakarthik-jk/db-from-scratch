@@ -121,14 +121,15 @@ where
     }
 
     fn parse_predicate(&mut self) -> Result<Option<Expression>, DBError> {
-        if self
+        let predicate = if self
             .consume_if(TokenKind::Keyword(Keyword::Where))
             .is_some()
         {
-            Ok(Some(self.parse_expression()?))
+            Some(self.parse_expression()?)
         } else {
-            Ok(None)
-        }
+            None
+        };
+        Ok(predicate)
     }
 
     fn parse_expression(&mut self) -> Result<Expression, DBError> {

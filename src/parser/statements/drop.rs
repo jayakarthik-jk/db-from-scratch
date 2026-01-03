@@ -12,6 +12,6 @@ where
     pub(crate) fn parse_drop_statement(&mut self) -> Result<Statement, DBError> {
         self.expect(TokenKind::Keyword(Keyword::Table))?;
         let table_name = self.expected_identifier()?;
-        Ok(Statement::Drop { table_name })
+        Ok(Statement::DropTable { table_name })
     }
 }

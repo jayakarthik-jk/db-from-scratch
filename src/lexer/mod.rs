@@ -13,7 +13,7 @@ use crate::{
 };
 use keyword::Keyword;
 use literal::Literal;
-use source::Character;
+use source::Atom;
 use std::iter::Peekable;
 use symbol::Symbol;
 pub(crate) use token::Token;
@@ -21,19 +21,19 @@ use token::TokenKind;
 
 pub(crate) struct Lexer<Characters>
 where
-    Characters: Iterator<Item = Character>,
+    Characters: Iterator<Item = Atom>,
 {
-    characters: Peekable<Characters>,
+    atoms: Peekable<Characters>,
 }
 
 impl<T> Iterator for Lexer<T>
 where
-    T: Iterator<Item = Character>,
+    T: Iterator<Item = Atom>,
 {
     type Item = Result<Token, DBError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some(ch) = self.next_character() {
+        while let Some(ch) = self.next_atom() {
             let token = match ch.value {
                 ch if ch.is_whitespace() => {
                     continue;
@@ -105,16 +105,22 @@ where
 
                 '~' => Token::from_symbol(Symbol::BitNot, ch.position),
 
-                '\"' | '\'' => return Some(self.collect_string_literal(ch)),
+                '\"' | '\'' => match self.collect_string_literal(ch) {
+                    Ok(token) => token,
+                    err => return Some(err),
+                },
 
                 // skip comments
                 '#' => {
-                    self.characters.find(|ch| ch.value != '\n');
+                    self.atoms.find(|ch| ch.value != '\n');
                     continue;
                 }
 
                 // Numeric Literals
-                ch_val if ch_val.is_ascii_digit() => return Some(self.collect_numeric_literal(ch)),
+                ch_val if ch_val.is_ascii_digit() => match self.collect_numeric_literal(ch) {
+                    Ok(token) => token,
+                    err => return Some(err),
+                },
                 // Identifiers and keywords
                 ch_val if Self::is_valid_ident(ch_val) => self.collect_ident(ch),
 
@@ -122,6 +128,7 @@ where
                     return Some(Err(DBError::IllegalCharacter(value, ch.position)));
                 }
             };
+
             return Some(Ok(token));
         }
         None
@@ -130,28 +137,28 @@ where
 
 impl<T> Lexer<T>
 where
-    T: Iterator<Item = Character>,
+    T: Iterator<Item = Atom>,
 {
-    pub(crate) fn new(characters: T) -> Self {
+    pub(crate) fn new(atoms: T) -> Self {
         Self {
-            characters: characters.peekable(),
+            atoms: atoms.peekable(),
         }
     }
 
     fn if_next(&mut self, expected: char) -> bool {
-        self.characters.if_consume(|ch| ch.value == expected)
+        self.atoms.if_consume(|ch| ch.value == expected)
     }
 
-    fn next_character(&mut self) -> Option<Character> {
-        self.characters.next()
+    fn next_atom(&mut self) -> Option<Atom> {
+        self.atoms.next()
     }
 
-    fn collect_rest_of_number(&mut self, initial_char: Character) -> (String, Position) {
+    fn collect_rest_of_number(&mut self, initial_char: Atom) -> (String, Position) {
         let mut number_as_string = String::from(initial_char.value);
         let mut last_position = initial_char.position;
 
         while let Some(next_ch) = self
-            .characters
+            .atoms
             .consume_if(|next_ch| next_ch.value.is_ascii_digit())
         {
             number_as_string.push(next_ch.value);
@@ -161,18 +168,15 @@ where
         (number_as_string, last_position)
     }
 
-    pub(crate) fn collect_string_literal(
-        &mut self,
-        enclosing: Character,
-    ) -> Result<Token, DBError> {
+    pub(crate) fn collect_string_literal(&mut self, enclosing: Atom) -> Result<Token, DBError> {
         let mut word = String::new();
         while let Some(next_ch) = self
-            .characters
+            .atoms
             .consume_if(|next_ch| next_ch.value != enclosing.value && next_ch.value != '\n')
         {
             word.push(next_ch.value);
         }
-        if let Some(last) = self.characters.consume_if(|ch| ch.value == enclosing.value) {
+        if let Some(last) = self.atoms.consume_if(|ch| ch.value == enclosing.value) {
             return Ok(Token::new(
                 TokenKind::Literal(word.into()),
                 Span {
@@ -185,13 +189,10 @@ where
         Err(DBError::UnTerminatedStringLiteral(enclosing.position))
     }
 
-    pub(crate) fn collect_numeric_literal(
-        &mut self,
-        initial_char: Character,
-    ) -> Result<Token, DBError> {
+    pub(crate) fn collect_numeric_literal(&mut self, initial_char: Atom) -> Result<Token, DBError> {
         let (number_as_string, last_position) = self.collect_rest_of_number(initial_char);
 
-        if let Some(next_ch) = self.characters.consume_if(|ch| ch.value == '.') {
+        if let Some(next_ch) = self.atoms.consume_if(|ch| ch.value == '.') {
             // Collect the fractional part of the number.
             let (fraction_ch, last_position) = self.collect_rest_of_number(next_ch);
             if fraction_ch.len() == 1 {
@@ -226,12 +227,12 @@ where
         }
     }
 
-    pub(crate) fn collect_ident(&mut self, ch: Character) -> Token {
+    pub(crate) fn collect_ident(&mut self, ch: Atom) -> Token {
         let mut word = String::from(ch.value);
         let mut last = ch;
 
         while let Some(next_ch) = self
-            .characters
+            .atoms
             .consume_if(|next_ch| Self::is_valid_ident(next_ch.value))
         {
             word.push(next_ch.value);

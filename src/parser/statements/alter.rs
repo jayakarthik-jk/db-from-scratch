@@ -30,7 +30,7 @@ where
         let alter_types =
             self.parse_seperated(Symbol::Comma, |parser| parser.parse_alter_type())?;
 
-        Ok(Statement::Alter {
+        Ok(Statement::AlterTable {
             table_name,
             alter_types,
         })

@@ -23,7 +23,7 @@ where
 
         self.expect(TokenKind::Symbol(Symbol::CloseParanthesis))?;
 
-        Ok(Statement::Create {
+        Ok(Statement::CreateTable {
             table_name,
             columns,
         })

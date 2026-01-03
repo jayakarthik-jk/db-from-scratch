@@ -1,103 +1,139 @@
-use std::{cell::RefCell, io::Read};
+use std::io::{BufRead, BufReader, Read};
 
-use crate::common::position::Position;
+use crate::common::position::{Position, Span};
 
-pub(crate) struct Source<R: Read> {
-    reader: RefCell<R>,
-    content: RefCell<String>,
+pub(crate) struct RawStatementIterator<'r> {
+    position: Position,
+    raw_statement: &'r RawStatement,
 }
 
-impl<R: Read> Source<R> {
-    pub(crate) fn new(reader: R) -> Self {
+impl<'r> RawStatementIterator<'r> {
+    fn new(raw_statement: &'r RawStatement) -> Self {
         Self {
-            reader: RefCell::new(reader),
-            content: RefCell::new(String::new()),
-        }
-    }
-
-    pub(crate) fn iter(&self) -> SourceIterator<R> {
-        SourceIterator::new(self)
-    }
-
-    fn refill(&self) -> bool {
-        let mut content = self.content.borrow_mut();
-        let mut temp = [0u8; 1024 * 8]; // 8 KiB buffer
-        let mut reader = self.reader.borrow_mut();
-        let n = reader.read(&mut temp).expect("Read failed");
-
-        if n == 0 {
-            return false;
-        }
-
-        content.push_str(std::str::from_utf8(&temp[..n]).expect("Invalid UTF-8 in source"));
-
-        true
-    }
-
-    pub(crate) fn char_at(&self, index: usize) -> Option<char> {
-        self.content.borrow().chars().nth(index)
-    }
-
-    // pub(crate) fn slice(&self, span: Span) -> Option<String> {
-    //     let content = self.content.borrow();
-    //     content
-    //         .get(span.start.index..=span.end.index)
-    //         .map(ToString::to_string)
-    // }
-
-    // pub(crate) fn complete(&self) -> String {
-    //     self.content.replace(String::new())
-    // }
-}
-// iterates over a source by char. asumes source is valid utf8
-
-pub(crate) struct SourceIterator<'s, R: Read> {
-    source: &'s Source<R>,
-    cursor: usize,
-    pub(crate) position: Position,
-}
-
-impl<'s, R: Read> SourceIterator<'s, R> {
-    pub(crate) fn new(source: &'s Source<R>) -> Self {
-        Self {
-            source,
-            cursor: 0,
+            raw_statement,
             position: Position::default(),
         }
     }
 }
 
-impl<'a, R: Read> Iterator for SourceIterator<'a, R> {
-    type Item = Character;
+impl<'r> Iterator for RawStatementIterator<'r> {
+    type Item = Atom;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let len = {
-            let content = self.source.content.borrow();
-            content.len()
-        };
-
-        if self.cursor >= len && !self.source.refill() {
-            return None;
-        }
-
-        // use char_at to get the next Character
-        self.source.char_at(self.cursor).map(|c| {
+        let ch = self
+            .raw_statement
+            .content
+            .get(self.position.index..)
+            .and_then(|s| s.chars().next());
+        ch.map(|c| {
             // update cursor and position
-            let character = Character {
+            let atom = Atom {
                 value: c,
                 position: self.position,
+                absolute_position: self.raw_statement.span.start + self.position,
             };
 
-            self.cursor += c.len_utf8();
             self.position += c;
 
-            character
+            atom
         })
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct Character {
-    pub(crate) value: char,
+// iterates over a source by char. asumes source is valid utf8
+pub(crate) struct RawStatement {
+    pub(crate) content: String,
+    pub(crate) span: Span,
+}
+
+impl RawStatement {
+    pub(crate) fn iter<'r>(&'r self) -> RawStatementIterator<'r> {
+        RawStatementIterator::new(self)
+    }
+}
+
+/// Split the source by semicolon and yield RawStatements
+/// Assumes the source is valid utf8
+pub(crate) struct SourceIterator<R>
+where
+    R: Read,
+{
+    source: BufReader<R>,
     pub(crate) position: Position,
+}
+
+impl<R> SourceIterator<R>
+where
+    R: Read,
+{
+    const SEPERATOR: u8 = b';';
+
+    pub(crate) fn new(source: R) -> Self {
+        Self {
+            source: BufReader::new(source),
+            position: Position::default(),
+        }
+    }
+}
+
+impl<R> Iterator for SourceIterator<R>
+where
+    R: Read,
+{
+    type Item = RawStatement;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // read until semicolon
+        let mut raw_statement = Vec::new();
+        let start_position = self.position;
+        // take until semicolon
+        let read = self
+            .source
+            .read_until(Self::SEPERATOR, &mut raw_statement)
+            .inspect_err(|e| eprintln!("Error reading source: {}", e))
+            .ok()?;
+
+        if read == 0 {
+            return None;
+        }
+
+        let raw_statement = String::from_utf8(raw_statement)
+            .expect("Source is not valid utf8")
+            .to_string();
+
+        self.position += raw_statement.as_str();
+
+        Some(RawStatement {
+            content: raw_statement,
+            span: Span {
+                start: start_position,
+                end: self.position,
+            },
+        })
+    }
+}
+
+pub(crate) trait SplitRawStatements<R>
+where
+    R: Read,
+{
+    fn split_raw_statements(self) -> SourceIterator<R>;
+}
+
+impl<R> SplitRawStatements<R> for R
+where
+    R: Read,
+{
+    fn split_raw_statements(self) -> SourceIterator<R> {
+        SourceIterator::new(self)
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Atom {
+    pub(crate) value: char,
+    // position in the current raw statement
+    pub(crate) position: Position,
+    // position in the whole source
+    pub(crate) absolute_position: Position,
 }

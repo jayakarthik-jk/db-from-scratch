@@ -20,16 +20,19 @@ pub(crate) struct Column {
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum Statement {
+    CreateDatabase {
+        database_name: Ident,
+    },
     // DDL
-    Create {
+    CreateTable {
         table_name: Ident,
         columns: Vec<Column>,
     },
-    Alter {
+    AlterTable {
         table_name: Ident,
         alter_types: Vec<AlterType>,
     },
-    Drop {
+    DropTable {
         table_name: Ident,
     },
     // DML
@@ -58,7 +61,7 @@ pub(crate) enum Statement {
 impl Display for Statement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Statement::Create {
+            Statement::CreateTable {
                 table_name,
                 columns,
             } => {
@@ -71,7 +74,7 @@ impl Display for Statement {
                 }
                 write!(f, ")")
             }
-            Statement::Alter {
+            Statement::AlterTable {
                 table_name,
                 alter_types,
             } => {
@@ -91,7 +94,7 @@ impl Display for Statement {
                 }
                 Ok(())
             }
-            Statement::Drop { table_name } => write!(f, "DROP TABLE {}", table_name),
+            Statement::DropTable { table_name } => write!(f, "DROP TABLE {}", table_name),
             Statement::Insert {
                 table_name,
                 columns,
@@ -156,6 +159,9 @@ impl Display for Statement {
                     write!(f, " WHERE {}", pred)?;
                 }
                 Ok(())
+            }
+            Statement::CreateDatabase { database_name } => {
+                write!(f, "CREATE DATABASE {}", database_name)
             }
         }
     }

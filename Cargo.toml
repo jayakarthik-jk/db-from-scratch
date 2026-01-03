@@ -4,5 +4,3 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-# bitflags = { version = "2.8", features = ["bytemuck"] }
-# bytemuck = { version = "1.21", features = ["derive"] }

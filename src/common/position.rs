@@ -7,6 +7,7 @@ use std::{
 pub(crate) struct Position {
     pub(crate) row: usize,
     pub(crate) col: usize,
+    // The byte index in the source
     pub(crate) index: usize,
 }
 
@@ -22,15 +23,35 @@ impl Add<usize> for Position {
     }
 }
 
+impl Add for Position {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self {
+            row: self.row + rhs.row,
+            col: self.col + rhs.col,
+            index: self.index + rhs.index,
+        }
+    }
+}
+
 impl AddAssign<char> for Position {
     fn add_assign(&mut self, rhs: char) {
-        let len = rhs.len_utf8();
-        self.index += len;
-        if rhs == '\n' {
-            self.row += 1;
-            self.col = 0;
-        } else {
-            self.col += len;
+            let len = rhs.len_utf8();
+            self.index += len;
+            if rhs == '\n' {
+                self.row += 1;
+                self.col = 0;
+            } else {
+                self.col += len;
+            }
+    }
+}
+
+impl AddAssign<&str> for Position {
+    fn add_assign(&mut self, rhs: &str) {
+        for ch in rhs.chars() {
+            *self += ch;
         }
     }
 }
